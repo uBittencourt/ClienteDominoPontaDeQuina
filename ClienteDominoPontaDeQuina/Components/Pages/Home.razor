@@ -1,7 +1,187 @@
 ﻿@page "/"
+@inject DominoApiService ApiService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Início - Dominó Ponta de Quina</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container mt-4">
+    <div class="card shadow-sm p-4 mb-4 bg-light">
+        <h2 class="text-primary">Cliente Dominó Ponta de Quina</h2>
+        <p class="text-muted">Checkpoint 6 - Gestão de Sessão e Jogadores</p>
+        <button class="btn btn-primary btn-lg" @onclick="CarregarDadosIniciais">
+            <span class="bi bi-arrow-clockwise"></span> Testar Sessão e Listar Jogadores
+        </button>
+    </div>
 
-Welcome to your new app.
+    @if (!string.IsNullOrEmpty(mensagemStatus))
+    {
+        <div class="alert @classeAlerta alert-dismissible fade show" role="alert">
+            @mensagemStatus
+        </div>
+    }
+
+    @if (sessao != null)
+    {
+        <div class="card shadow-sm p-3 mb-4">
+            <h5 class="text-success">Sessão Autenticada com Sucesso</h5>
+            <p class="mb-0"><strong>ID do Usuário:</strong> <code>@sessao.UsuarioId</code></p>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Coluna da Esquerda: Listagem de Jogadores -->
+        <div class="col-md-7">
+            <div class="card shadow-sm p-3 mb-4">
+                <h4>Meus Jogadores Cadastrados</h4>
+                @if (jogadores != null && jogadores.Any())
+                {
+                    <div class="list-group mt-3">
+                        @foreach (var j in jogadores)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1"><strong>@j.Nome</strong></h6>
+                                    <small class="text-muted">ID: @j.JogadorId</small>
+                                </div>
+                                <div>
+                                    @if (j.Ativo)
+                                    {
+                                        <span class="badge bg-success">Ativo neste Cliente</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inativo</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mt-2">Nenhum jogador encontrado ou conexão não realizada.</p>
+                }
+            </div>
+        </div>
+
+        <!-- Coluna da Direita: Criar Novo Jogador -->
+        <div class="col-md-5">
+            <div class="card shadow-sm p-3 mb-4">
+                <h4>Criar Novo Jogador</h4>
+                <div class="mb-3 mt-3">
+                    <label for="nomeJogador" class="form-label">Nome do Jogador (1 a 150 caracteres)</label>
+                    <input type="text" class="form-control" id="nomeJogador" @bind="novoNomeJogador" placeholder="Ex: BotVinicius" />
+                </div>
+                <button class="btn btn-success w-100" @onclick="CriarJogador">
+                    Criar Jogador na Conta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? tokenBearer;
+    private string? mensagemStatus;
+    private string classeAlerta = "alert-info";
+    private SessaoResponse? sessao;
+    private List<PerfilJogador> jogadores = new();
+    private string novoNomeJogador = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        tokenBearer = ApiService.ObterTokenConfigurado();
+    }
+
+    private async Task CarregarDadosIniciais()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(tokenBearer) || tokenBearer == "TOKEN_BEARER")
+            {
+                mensagemStatus = "Erro: O TOKEN_BEARER real não foi configurado corretamente no appsettings.Development.json.";
+                classeAlerta = "alert-danger";
+                StateHasChanged();
+                return;
+            }
+
+            mensagemStatus = "Consultando sessão e jogadores na API...";
+            classeAlerta = "alert-info";
+            StateHasChanged();
+
+            // 1. Valida a sessão
+            sessao = await ApiService.ConsultarSessaoAsync(tokenBearer);
+            if (sessao == null)
+            {
+                mensagemStatus = "Falha: O token Bearer é inválido, expirou ou foi revogado.";
+                classeAlerta = "alert-danger";
+                StateHasChanged();
+                return;
+            }
+
+            // 2. Lista os jogadores
+            jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
+            mensagemStatus = $"Conexão bem-sucedida! Sessão ativa e {jogadores.Count} jogador(es) carregado(s).";
+            classeAlerta = "alert-success";
+        }
+        catch (Exception ex)
+        {
+            mensagemStatus = $"Erro crítico ao comunicar com a API: {ex.Message}";
+            classeAlerta = "alert-danger";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task CriarJogador()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(novoNomeJogador))
+            {
+                mensagemStatus = "Informe um nome válido para o jogador.";
+                classeAlerta = "alert-warning";
+                StateHasChanged();
+                return;
+            }
+
+            if (string.IsNullOrEmpty(tokenBearer) || tokenBearer == "TOKEN_BEARER")
+            {
+                mensagemStatus = "Erro: Token Bearer não configurado.";
+                classeAlerta = "alert-danger";
+                StateHasChanged();
+                return;
+            }
+
+            mensagemStatus = $"Criando o jogador '{novoNomeJogador}'...";
+            classeAlerta = "alert-info";
+            StateHasChanged();
+
+            var criado = await ApiService.CriarJogadorAsync(tokenBearer, novoNomeJogador.Trim());
+            if (criado != null)
+            {
+                mensagemStatus = $"Jogador '{criado.Nome}' criado com sucesso! ID: {criado.JogadorId}";
+                classeAlerta = "alert-success";
+                novoNomeJogador = string.Empty;
+                
+                // Atualiza a lista automaticamente
+                jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
+            }
+            else
+            {
+                mensagemStatus = "Erro ao criar jogador. Verifique se o nome atende às restrições (1 a 150 caracteres).";
+                classeAlerta = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensagemStatus = $"Erro ao criar jogador: {ex.Message}";
+            classeAlerta = "alert-danger";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+}
