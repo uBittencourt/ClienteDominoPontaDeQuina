@@ -1,0 +1,59 @@
+﻿/* Home.razor.css */
+
+.game-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr 320px;
+    height: 100vh;
+    width: 100vw;
+    background-color: #101214;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+.layout-section {
+    background-color: rgba(25, 28, 31, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow-y: auto;
+    height: 100vh;
+}
+
+.left-section {
+    grid-column: 1;
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+}
+
+.center-section {
+    grid-column: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #121518;
+}
+
+.right-section {
+    grid-column: 3;
+    border-left: 1px solid rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+}
+
+.placeholder-content {
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    max-width: 400px;
+}
+
+.placeholder-title {
+    color: #FBC43A;
+    margin-bottom: 10px;
+    font-weight: bold;
+}

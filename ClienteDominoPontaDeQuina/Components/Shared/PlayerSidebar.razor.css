@@ -1,0 +1,120 @@
+﻿/* PlayerSidebar.razor.css */
+
+.sidebar-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.card-header-game, .section-header-game {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+    .card-header-game h5, .section-header-game h5 {
+        color: #FBC43A;
+        font-size: 0.85rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+.client-card, .create-player-card {
+    background-color: rgba(33, 37, 41, 0.6);
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.client-label {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+}
+
+.client-uuid {
+    color: #e0e0e0;
+    font-size: 0.75rem;
+    background-color: #101214;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: block;
+    margin: 4px 0;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.status-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 8px;
+}
+
+.status-online {
+    background-color: rgba(40, 167, 69, 0.15);
+    color: #2ecc71;
+    border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.players-section {
+    margin-top: 10px;
+    flex: 1;
+}
+
+.players-list-game {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.player-item-game {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: rgba(33, 37, 41, 0.4);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.player-name-game {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+    display: block;
+}
+
+.player-id-game {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: monospace;
+}
+
+.player-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.badge-active-game {
+    color: #FBC43A;
+    font-size: 0.6rem;
+    font-weight: 900;
+    border: 1px solid rgba(251, 196, 58, 0.4);
+    padding: 2px 5px;
+    border-radius: 4px;
+    background-color: rgba(251, 196, 58, 0.05);
+}
+
+.client-loading, .players-loading, .no-players {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.75rem;
+}

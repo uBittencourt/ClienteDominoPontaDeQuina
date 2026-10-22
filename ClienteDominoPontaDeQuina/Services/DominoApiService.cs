@@ -1,11 +1,13 @@
-﻿using System.Text.Json;
+﻿using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using ClienteDominoPontaDeQuina.Models;
 
 namespace ClienteDominoPontaDeQuina.Services;
 
 /// <summary>
 /// Serviço responsável por gerenciar a comunicação HTTP com a API oficial do Dominó Ponta de Quina.
-/// Concentra as operações de identidade, gestão de jogadores, criação e interação com partidas.
+/// Concentra operações de identidade, listagem, criação e controle de ativação de jogadores.
 /// </summary>
 public class DominoApiService
 {
@@ -17,11 +19,10 @@ public class DominoApiService
     };
 
     /// <summary>
-    /// Inicializa uma nova instância do serviço de API do dominó, configurando a URL base obtida do ambiente.
+    /// Inicializa uma nova instância do serviço da API de dominó.
     /// </summary>
-    /// <param name="httpClient">Cliente HTTP injetado pelo container de dependências.</param>
-    /// <param name="configuration">Configurações da aplicação para leitura de parâmetros locais.</param>
-    /// <exception cref="InvalidOperationException">Lançada caso a URL base não esteja configurada.</exception>
+    /// <param name="httpClient">Instância do HttpClient injetada pelo container.</param>
+    /// <param name="configuration">Configurações da aplicação para leitura de parâmetros.</param>
     public DominoApiService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
@@ -37,29 +38,19 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Obtém automaticamente o Token Bearer configurado no ambiente de desenvolvimento.
+    /// Obtém o token Bearer configurado no ambiente de desenvolvimento de forma segura.
     /// </summary>
+    /// <returns>O token de acesso configurado, ou nulo se ausente.</returns>
     public string? ObterTokenConfigurado()
     {
         return _configuration["TOKEN_BEARER"];
     }
 
     /// <summary>
-    /// Solicita a geração e envio de um token de acesso via e-mail corporativo/FIAP.
-    /// </summary>
-    /// <param name="email">E-mail cadastrado do usuário.</param>
-    public async Task SolicitarTokenAsync(string email)
-    {
-        var request = new SolicitarTokenRequest(email);
-        var response = await _httpClient.PostAsJsonAsync("/api/identidade/token", request);
-        response.EnsureSuccessStatusCode();
-    }
-
-    /// <summary>
     /// Consulta os dados da sessão atual vinculada ao token Bearer fornecido.
     /// </summary>
     /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <returns>Dados da sessão contendo o ID do usuário autenticado, ou nulo em caso de falha.</returns>
+    /// <returns>Objeto contendo os dados da sessão do usuário autenticado, ou nulo em caso de falha.</returns>
     public async Task<SessaoResponse?> ConsultarSessaoAsync(string tokenBearer)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Get, "/api/identidade/sessao");
@@ -75,7 +66,7 @@ public class DominoApiService
     /// Lista todos os perfis de jogadores associados à conta autenticada.
     /// </summary>
     /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <returns>Lista de perfis de jogadores cadastrados.</returns>
+    /// <returns>Uma lista contendo os perfis dos jogadores cadastrados.</returns>
     public async Task<List<PerfilJogador>> ListarJogadoresAsync(string tokenBearer)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Get, "/api/jogadores");
@@ -91,8 +82,8 @@ public class DominoApiService
     /// Cria um novo perfil de jogador na conta autenticada.
     /// </summary>
     /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <param name="nome">Nome identificador do jogador (entre 1 e 150 caracteres).</param>
-    /// <returns>O perfil do jogador recém-criado, contendo seu ID gerado pela API.</returns>
+    /// <param name="nome">Nome do jogador (entre 1 e 150 caracteres).</param>
+    /// <returns>O perfil do jogador recém-criado, contendo seu identificador exclusivo.</returns>
     public async Task<PerfilJogador?> CriarJogadorAsync(string tokenBearer, string nome)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/jogadores")
@@ -108,12 +99,12 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Realiza a ativação exclusiva de um jogador neste cliente utilizando uma chave secreta de 64 caracteres hexadecimais.
+    /// Realiza a ativação do cliente para um jogador específico utilizando uma chave de 64 caracteres hexadecimais.
     /// </summary>
     /// <param name="tokenBearer">Token de autenticação da conta.</param>
     /// <param name="jogadorId">Identificador único do jogador.</param>
-    /// <param name="chaveAtivacao">Chave gerada localmente pelo cliente (32 bytes em hex).</param>
-    /// <returns>O perfil atualizado do jogador com status ativo.</returns>
+    /// <param name="chaveAtivacao">Chave gerada localmente enviada no corpo da requisição.</param>
+    /// <returns>O perfil atualizado do jogador refletindo o estado ativo.</returns>
     public async Task<PerfilJogador?> AtivarClienteAsync(string tokenBearer, Guid jogadorId, string chaveAtivacao)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/jogadores/{jogadorId}/ativar-cliente")
@@ -129,41 +120,27 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Lista as partidas que estão atualmente aguardando o segundo participante.
+    /// Desativa o cliente de um jogador informando a chave correspondente no cabeçalho de segurança.
     /// </summary>
     /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <returns>Coleção de partidas disponíveis para ingresso.</returns>
-    public async Task<List<PartidaDisponivel>> ListarPartidasDisponiveisAsync(string tokenBearer)
+    /// <param name="jogadorId">Identificador único do jogador.</param>
+    /// <param name="chaveAtivacao">Chave secreta original enviada no header X-Jogador-Ativacao.</param>
+    /// <returns>O perfil atualizado do jogador com o status inativado.</returns>
+    public async Task<PerfilJogador?> DesativarClienteAsync(string tokenBearer, Guid jogadorId, string chaveAtivacao)
     {
-        var requestMessage = new HttpRequestMessage(HttpMethod.Get, "/api/partidas");
-        requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
+        var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/jogadores/{jogadorId}/desativar-cliente");
 
-        var response = await _httpClient.SendAsync(requestMessage);
-        if (!response.IsSuccessStatusCode) return new();
-
-        return await response.Content.ReadFromJsonAsync<List<PartidaDisponivel>>(_jsonOptions) ?? new();
-    }
-
-    /// <summary>
-    /// Cria uma nova partida de dominó definindo a pontuação alvo e registrando o jogador criador.
-    /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <param name="chaveAtivacao">Chave secreta de ativação do jogador (enviada no cabeçalho X-Jogador-Ativacao).</param>
-    /// <param name="pontuacaoAlvo">Pontuação necessária para vencer a partida (ex: 50 ou 100).</param>
-    /// <param name="jogadorId">ID do jogador criador.</param>
-    /// <returns>O estado inicial completo da partida criada.</returns>
-    public async Task<EstadoPartidaParticipante?> CriarPartidaAsync(string tokenBearer, string chaveAtivacao, int pontuacaoAlvo, Guid jogadorId)
-    {
-        var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/partidas")
-        {
-            Content = JsonContent.Create(new CriarPartidaRequest(pontuacaoAlvo, jogadorId, null))
-        };
         requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
         requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao);
 
         var response = await _httpClient.SendAsync(requestMessage);
-        if (!response.IsSuccessStatusCode) return null;
 
-        return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
+        if (!response.IsSuccessStatusCode)
+        {
+            var erroDetalhe = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Erro da API ({(int)response.StatusCode}): {erroDetalhe}");
+        }
+
+        return await response.Content.ReadFromJsonAsync<PerfilJogador>(_jsonOptions);
     }
 }
