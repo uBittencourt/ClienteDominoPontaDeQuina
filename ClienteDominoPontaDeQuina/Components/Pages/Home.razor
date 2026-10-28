@@ -4,7 +4,7 @@
 <PageTitle>Dominó Ponta de Quina</PageTitle>
 
 <div class="game-layout">
-    <!-- Sidebar de Jogadores e Sessão -->
+    <!-- Gestão de Jogadores e Sessão -->
     <div class="layout-section left-section">
         <PlayerSidebar />
     </div>
@@ -13,11 +13,43 @@
     <div class="layout-section center-section">
         <div class="placeholder-content">
             <div class="placeholder-title">MESA DE DOMINÓ</div>
+            <p class="text-muted small">O tabuleiro e as peças em jogo aparecerão aqui.</p>
         </div>
     </div>
 
     <!-- Lobby de Partidas -->
     <div class="layout-section right-section">
-        <MatchesSidebar />
+        <MatchesSidebar tokenBearer="@tokenBearer" jogadores="@jogadores" OnAtualizarRequerido="CarregarDadosGlobais" />
     </div>
 </div>
+
+@code {
+    private string? tokenBearer;
+    private List<PerfilJogador> jogadores = new();
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        tokenBearer = ApiService.ObterTokenConfigurado();
+        jogadores = new();
+    }
+
+    /// <summary>
+    /// Sincroniza a listagem de jogadores da API após o usuário carregar/autenticar a sessão.
+    /// </summary>
+    public async Task CarregarDadosGlobais()
+    {
+        tokenBearer = ApiService.ObterTokenConfigurado();
+        if (string.IsNullOrEmpty(tokenBearer)) return;
+
+        try
+        {
+            jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
+            StateHasChanged();
+        }
+        catch
+        {
+            jogadores = new();
+        }
+    }
+}

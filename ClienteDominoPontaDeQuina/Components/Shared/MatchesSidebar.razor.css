@@ -1,0 +1,92 @@
+﻿/* MatchesSidebar.razor.css */
+.sidebar-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.section-header-game {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 8px;
+    margin-bottom: 5px;
+}
+
+    .section-header-game h5 {
+        color: #FBC43A;
+        font-size: 0.85rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+.create-player-card {
+    background-color: rgba(33, 37, 41, 0.6);
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.input-label-game {
+    font-size: 0.68rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 3px;
+    display: block;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.players-section {
+    margin-top: 5px;
+    flex: 1;
+}
+
+.players-list-game {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.player-item-game {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background-color: rgba(33, 37, 41, 0.4);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    gap: 8px;
+}
+
+.player-name-game {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #FBC43A;
+}
+
+.player-id-game {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.badge-active-game {
+    color: #FBC43A;
+    font-size: 0.6rem;
+    font-weight: 900;
+    border: 1px solid rgba(251, 196, 58, 0.4);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: rgba(251, 196, 58, 0.05);
+}
+
+.no-players {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.75rem;
+}

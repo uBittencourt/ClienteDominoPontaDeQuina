@@ -27,8 +27,7 @@ public record PartidaDisponivel(
 /// <param name="Webhook">URL opcional para recebimento de notificações assíncronas de eventos da partida.</param>
 public record CriarPartidaRequest(
     int PontuacaoAlvo,
-    Guid JogadorId,
-    string? Webhook = null
+    Guid JogadorId
 );
 
 /// <summary>
