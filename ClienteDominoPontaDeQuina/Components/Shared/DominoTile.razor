@@ -1,0 +1,18 @@
+﻿<div class="d-flex @FlexDirection align-items-center justify-content-between bg-light text-dark rounded border border-warning shadow-sm p-1 position-relative" style="width: @Width; height: @Height; user-select: none;">
+    <span class="fw-bold" style="font-size: 0.8rem; line-height: 1;">@ValorA</span>
+    <div style="@DividerStyle"></div>
+    <span class="fw-bold" style="font-size: 0.8rem; line-height: 1;">@ValorB</span>
+</div>
+
+@code {
+    [Parameter] public int ValorA { get; set; }
+    [Parameter] public int ValorB { get; set; }
+    [Parameter] public bool IsHorizontal { get; set; } = true;
+
+    private string Width => IsHorizontal ? "65px" : "36px";
+    private string Height => IsHorizontal ? "32px" : "64px";
+    private string FlexDirection => IsHorizontal ? "flex-row" : "flex-column";
+    private string DividerStyle => IsHorizontal 
+        ? "width: 2px; height: 100%; background-color: #ffc107; margin: 0 4px;" 
+        : "width: 100%; height: 2px; background-color: #ffc107; margin: 2px 0;";
+}

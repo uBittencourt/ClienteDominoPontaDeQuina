@@ -11,32 +11,33 @@
 
     <!-- Mesa de Jogo -->
     <div class="layout-section center-section">
-        <div class="placeholder-content">
-            <div class="placeholder-title">MESA DE DOMINÓ</div>
-            <p class="text-muted small">O tabuleiro e as peças em jogo aparecerão aqui.</p>
-        </div>
+        <GameTable tokenBearer="@tokenBearer"
+                   jogadores="@jogadores"
+                   partidaId="@partidaAtualId"
+                   @bind-estadoPartida="estadoPartidaAtiva" />
     </div>
 
     <!-- Lobby de Partidas -->
     <div class="layout-section right-section">
-        <MatchesSidebar tokenBearer="@tokenBearer" jogadores="@jogadores" OnAtualizarRequerido="CarregarDadosGlobais" />
+        <MatchesSidebar tokenBearer="@tokenBearer"
+                        jogadores="@jogadores"
+                        OnAtualizarRequerido="CarregarDadosGlobais"
+                        OnPartidaIngressadaCustom="(args) => HandlePartidaIngressadaCustom(args.PartidaId, args.Estado)" />
     </div>
 </div>
 
 @code {
     private string? tokenBearer;
     private List<PerfilJogador> jogadores = new();
+    private EstadoPartidaParticipante? estadoPartidaAtiva;
+    private Guid? partidaAtualId;
 
-    /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
         tokenBearer = ApiService.ObterTokenConfigurado();
-        jogadores = new();
+        await CarregarDadosGlobais();
     }
 
-    /// <summary>
-    /// Sincroniza a listagem de jogadores da API após o usuário carregar/autenticar a sessão.
-    /// </summary>
     public async Task CarregarDadosGlobais()
     {
         tokenBearer = ApiService.ObterTokenConfigurado();
@@ -51,5 +52,15 @@
         {
             jogadores = new();
         }
+    }
+
+    /// <summary>
+    /// Captura o ID da partida e o estado no momento do ingresso, repassando para a mesa central.
+    /// </summary>
+    private void HandlePartidaIngressadaCustom(Guid idPartida, EstadoPartidaParticipante novoEstado)
+    {
+        partidaAtualId = idPartida;
+        estadoPartidaAtiva = novoEstado;
+        StateHasChanged();
     }
 }

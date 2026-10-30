@@ -23,20 +23,20 @@
 
         <div class="mb-3">
             <span class="input-label-game">Jogador Criador</span>
-            @if (jogadores == null || !jogadores.Any(x => x.Ativo))
+            @if (jogadores == null || !jogadores.Any())
             {
                 <div class="alert alert-warning p-2 mb-0" style="font-size: 0.65rem;">
-                    Inicie sessão para visualizar os jogadores ativos.
+                    Nenhum jogador encontrado. Crie um jogador na barra esquerda.
                 </div>
             }
             else
             {
-                <select class="form-select form-select-sm bg-dark text-light border-secondary"
-                        @bind="jogadorCriadorIdStr" disabled="@carregando" style="font-size: 0.7rem;">
-                    <option value="">Selecione um jogador ativo...</option>
-                    @foreach (var j in jogadores.Where(x => x.Ativo))
+                <!-- Seleção de Criador de Sala -->
+                <select class="form-select form-select-sm bg-dark text-light border-secondary" @bind="jogadorCriadorIdStr" disabled="@carregando" style="font-size: 0.7rem;">
+                    <option value="">Selecione o jogador criador...</option>
+                    @foreach (var j in jogadores)
                     {
-                        <option value="@j.JogadorId">@j.Nome (Ativo)</option>
+                        <option value="@j.JogadorId">@j.Nome</option>
                     }
                 </select>
             }
@@ -71,15 +71,15 @@
             <div class="players-list-game">
                 @foreach (var p in partidas)
                 {
-                    <div class="player-item-game">
+                    <div class="player-item-game" style="height: auto; padding-bottom: 8px;">
                         <div class="w-100 d-flex justify-content-between align-items-center">
                             <span class="player-name-game">Meta: @p.PontuacaoAlvo pts</span>
                             <span class="badge-active-game">v@(p.VersaoEstado)</span>
                         </div>
-                        <span class="player-id-game" title="@p.PartidaId">ID: @p.PartidaId.ToString().Substring(0, 8)...</span>
 
-                        <!-- Controles de Ingressar -->
-                        <div class="w-100 border-top border-secondary pt-2 mt-1">
+                        <span class="player-id-game user-select-all mt-1" title="@p.PartidaId" style="font-size: 0.6rem; word-break: break-all; display: block; color: #adb5bd;">ID: @p.PartidaId</span>
+
+                        <div class="w-100 border-top border-secondary pt-2">
                             <div class="mb-2">
                                 <span class="input-label-game" style="font-size: 0.6rem;">Jogador Convidado (Ativo)</span>
                                 <select class="form-select form-select-sm bg-dark text-light border-secondary"
@@ -111,6 +111,8 @@
 </div>
 
 @code {
+    [Parameter] public EventCallback<EstadoPartidaParticipante> OnPartidaIngressada { get; set; }
+    [Parameter] public EventCallback<(Guid PartidaId, EstadoPartidaParticipante Estado)> OnPartidaIngressadaCustom { get; set; }
     [Parameter] public string? tokenBearer { get; set; }
     [Parameter] public List<PerfilJogador> jogadores { get; set; } = new();
     [Parameter] public EventCallback OnAtualizarRequerido { get; set; }
@@ -231,9 +233,6 @@
         }
     }
 
-    /// <summary>
-    /// Executa o caso de uso, validando a chave e o controle otimista.
-    /// </summary>
     private async Task IngressarPartida(Guid partidaId, long versaoEstado)
     {
         if (string.IsNullOrWhiteSpace(tokenBearer))
@@ -243,7 +242,7 @@
 
         if (!Guid.TryParse(jogadorIngressoIdStr, out var jogadorId))
         {
-            mensagemStatus = "Selecione um jogador convidado válido.";
+            mensagemStatus = "Selecione um jogador convidado válido no dropdown.";
             classeAlerta = "alert-warning";
             return;
         }
@@ -254,35 +253,28 @@
 
         if (string.IsNullOrWhiteSpace(chaveAtivacao))
         {
-            mensagemStatus =
-                "O jogador selecionado não possui uma chave de ativação neste navegador.";
+            mensagemStatus = "O jogador selecionado não possui uma chave de ativação neste navegador.";
             classeAlerta = "alert-danger";
             return;
         }
 
         carregando = true;
-        mensagemStatus = "Atualizando a sala antes do ingresso...";
+        mensagemStatus = "Ingressando na partida...";
         classeAlerta = "alert-info";
         StateHasChanged();
 
         try
         {
             partidas = await ApiService.ListarPartidasDisponiveisAsync(tokenBearer);
-            var partidaAtual = partidas.FirstOrDefault(
-                p => p.PartidaId == partidaId);
-
-            if (partidaAtual is null)
+            var partidaAtual = partidas.FirstOrDefault(p => p.PartidaId == partidaId);
+            if (partidaAtual != null)
             {
-                mensagemStatus =
-                    "Esta sala não aparece mais entre as partidas disponíveis. Atualize o lobby.";
-                classeAlerta = "alert-warning";
-                return;
+                versaoEstado = partidaAtual.VersaoEstado;
             }
 
-            versaoEstado = partidaAtual.VersaoEstado;
             var chaveIdempotencia = Guid.NewGuid();
 
-            var resultado = await ApiService.IngressarPartidaAsync(
+            var resultadoIngresso = await ApiService.IngressarPartidaAsync(
                 tokenBearer,
                 chaveAtivacao,
                 partidaId,
@@ -290,15 +282,17 @@
                 chaveIdempotencia,
                 jogadorId);
 
-            if (resultado is null)
+            if (resultadoIngresso is null)
             {
                 mensagemStatus = "A API não retornou o estado da partida.";
                 classeAlerta = "alert-danger";
                 return;
             }
 
-            mensagemStatus = "Ingresso realizado. A partida ainda pode precisar ser iniciada.";
+            mensagemStatus = "Ingresso realizado com sucesso! Inicie a partida.";
             classeAlerta = "alert-success";
+
+            await OnPartidaIngressadaCustom.InvokeAsync((partidaId, resultadoIngresso));
             await CarregarPartidas();
         }
         catch (Exception ex)
@@ -312,5 +306,4 @@
             StateHasChanged();
         }
     }
-
 }

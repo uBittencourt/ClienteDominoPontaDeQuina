@@ -1,14 +1,13 @@
 ﻿@inject DominoApiService ApiService
 @inject IJSRuntime JSRuntime
-
 <div class="sidebar-wrapper">
-    
+
     <!-- Painel de Controle -->
     <div class="client-card">
         <div class="card-header-game">
             <h5>PAINEL DE CONTROLE</h5>
         </div>
-        
+
         <button class="btn btn-sm btn-warning w-100 fw-bold text-dark" @onclick="CarregarDadosIniciais" disabled="@carregando">
             @if (carregando)
             {
@@ -42,7 +41,7 @@
     <div class="create-player-card">
         <h6 class="text-warning mb-2 font-weight-bold" style="font-size: 0.75rem;">NOVO JOGADOR</h6>
         <div class="mb-2">
-            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
                    @bind="novoNomeJogador" placeholder="Nome (1 a 150 chars)" disabled="@carregando" />
         </div>
         <button class="btn btn-sm btn-warning w-100 fw-bold" @onclick="CriarJogadorAsync" disabled="@carregando">
@@ -60,7 +59,7 @@
         @if (jogadores.Count == 0)
         {
             <div class="no-players">
-                <p class="text-muted small">Nenhum jogador listado. Clique em carregar acima.</p>
+                <p class="text-secondary small">Nenhum jogador listado. Clique em carregar acima.</p>
             </div>
         }
         else
@@ -68,25 +67,34 @@
             <div class="players-list-game">
                 @foreach (var j in jogadores)
                 {
-                    <div class="player-item-game">
-                        <div class="player-info-game">
-                            <span class="player-name-game">@j.Nome</span>
-                            <span class="player-id-game" title="@j.JogadorId">ID: @j.JogadorId.ToString().Substring(0, 8)...</span>
-                        </div>
+                    <div class="player-item-game" style="height: auto; padding-bottom: 8px;">
+                        <div class="player-info-game" style="overflow: hidden; width: 100%;">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <span class="player-name-game">@j.Nome</span>
+                                <div class="player-actions">
+                                    @if (j.Ativo)
+                                    {
+                                        <span class="badge-active-game">ATIVO</span>
+                                        <button class="btn btn-sm btn-outline-warning py-0 px-2" @onclick="() => DesativarJogadorAsync(j.JogadorId)" disabled="@carregando" style="font-size: 0.7rem;">
+                                            Desativar
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-warning py-0 px-2 text-dark fw-bold" @onclick="() => AtivarJogadorAsync(j.JogadorId)" disabled="@carregando" style="font-size: 0.7rem;">
+                                            Ativar
+                                        </button>
+                                    }
+                                </div>
+                            </div>
 
-                        <div class="player-actions">
-                            @if (j.Ativo)
+                            <!-- ID COMPLETO EXIBIDO AQUI -->
+                            <span class="player-id-game user-select-all mt-1" title="@j.JogadorId" style="font-size: 0.6rem; word-break: break-all; display: block; color: #adb5bd;">ID: @j.JogadorId</span>
+
+                            <!-- CHAVE DE ATIVAÇÃO CASO ESTEJA ATIVO E DISPONÍVEL -->
+                            @if (j.Ativo && chavesAtivas.ContainsKey(j.JogadorId))
                             {
-                                <span class="badge-active-game">ATIVO</span>
-                                <button class="btn btn-sm btn-outline-warning py-0 px-2" @onclick="() => DesativarJogadorAsync(j.JogadorId)" disabled="@carregando" style="font-size: 0.7rem;">
-                                    Desativar
-                                </button>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-warning py-0 px-2 text-dark fw-bold" @onclick="() => AtivarJogadorAsync(j.JogadorId)" disabled="@carregando" style="font-size: 0.7rem;">
-                                    Ativar
-                                </button>
+                                <span class="user-select-all mt-1" style="font-size: 0.58rem; word-break: break-all; display: block; color: #ffc107;">Chave: @chavesAtivas[j.JogadorId]</span>
                             }
                         </div>
                     </div>
@@ -100,6 +108,7 @@
     private string? tokenBearer;
     private SessaoResponse? sessao;
     private List<PerfilJogador> jogadores = new();
+    private Dictionary<Guid, string> chavesAtivas = new();
     private string novoNomeJogador = string.Empty;
     private bool carregando = false;
     private string? mensagemStatus;
@@ -135,6 +144,18 @@
             }
 
             jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
+
+            // Sincroniza as chaves salvas no localStorage para os jogadores ativos
+            chavesAtivas.Clear();
+            foreach (var j in jogadores.Where(x => x.Ativo))
+            {
+                var chave = await JSRuntime.InvokeAsync<string>("localStorage.getItem", $"chave_ativacao_{j.JogadorId}");
+                if (!string.IsNullOrEmpty(chave))
+                {
+                    chavesAtivas[j.JogadorId] = chave;
+                }
+            }
+
             mensagemStatus = $"{jogadores.Count} jogador(es) carregado(s).";
             classeAlerta = "alert-success";
         }
@@ -201,6 +222,7 @@
             if (resultado != null && resultado.Ativo)
             {
                 jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
+                chavesAtivas[jogadorId] = chaveHex;
                 mensagemStatus = "Cliente ativado!";
                 classeAlerta = "alert-success";
             }
@@ -238,6 +260,7 @@
             if (resultado != null && !resultado.Ativo)
             {
                 await JSRuntime.InvokeVoidAsync("localStorage.removeItem", $"chave_ativacao_{jogadorId}");
+                chavesAtivas.Remove(jogadorId);
                 jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
                 mensagemStatus = "Cliente desativado!";
                 classeAlerta = "alert-success";

@@ -224,4 +224,168 @@ public class DominoApiService
 
         return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
     }
+
+    /// <summary>
+    /// Consulta o estado atualizado e privado de uma partida em andamento para a visão do participante.
+    /// </summary>
+    /// <param name="tokenBearer">Token de autenticação da conta de usuário.</param>
+    /// <param name="chaveAtivacao">Chave secreta de ativação do jogador solicitante (X-Jogador-Ativacao).</param>
+    /// <param name="partidaId">Identificador único (Guid) da partida.</param>
+    /// <param name="jogadorId">Identificador único (Guid) do jogador consultando a visão privada.</param>
+    /// <param name="versaoConhecida">Versão atual conhecida localmente (usada para otimização com retorno 204).</param>
+    /// <returns>O estado completo e detalhado da partida (`EstadoPartidaParticipante`), ou nulo se não houver alterações (204).</returns>
+    /// <exception cref="InvalidOperationException">Lançado caso ocorra falha ou erro HTTP na consulta.</exception>
+    public async Task<EstadoPartidaParticipante?> ConsultarEstadoPartidaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, Guid jogadorId, long versaoEstado = 0)
+    {
+        // Monta a URL idêntica ao que funcionou no Swagger
+        var url = $"/api/partidas/{partidaId}?jogadorId={jogadorId}";
+        if (versaoEstado > 0)
+        {
+            url += $"&versaoEstado={versaoEstado}";
+        }
+
+        var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
+
+        // 1. Autorização da Conta (Bearer)
+        requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
+
+        // 2. Chave de Ativação do Jogador (Header exigido pelo requisito do professor)
+        requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao.Trim());
+
+        var response = await _httpClient.SendAsync(requestMessage);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
+        }
+
+        var erroDetalhe = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException($"Erro ao consultar partida [HTTP {(int)response.StatusCode}]: {erroDetalhe}");
+    }
+
+    /// <summary>
+    /// Executa uma jogada de encaixe de uma pedra em um dos lados do tabuleiro (0 = Esquerda, 1 = Direita).
+    /// </summary>
+    public async Task<EstadoPartidaParticipante?> JogarPecaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid jogadorId, int valorA, int valorB, int lado)
+    {
+        var payload = new JogarRequest(versaoEsperada, Guid.NewGuid(), jogadorId, valorA, valorB, lado);
+
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/partidas/{partidaId}/jogar")
+        {
+            Content = JsonContent.Create(payload)
+        };
+
+        requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
+        requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao.Trim());
+
+        var response = await _httpClient.SendAsync(requestMessage);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var erroDetalhe = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Jogada rejeitada [HTTP {(int)response.StatusCode}]: {erroDetalhe}");
+        }
+
+        return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
+    }
+
+    /// <summary>
+    /// Solicita a compra de uma peça na cava quando não há opções de encaixe na mão.
+    /// </summary>
+    public async Task<EstadoPartidaParticipante?> ComprarPecaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid jogadorId)
+    {
+        var payload = new AcaoRequest(versaoEsperada, Guid.NewGuid(), jogadorId);
+
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/partidas/{partidaId}/comprar")
+        {
+            Content = JsonContent.Create(payload)
+        };
+
+        requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
+        requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao.Trim());
+
+        var response = await _httpClient.SendAsync(requestMessage);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var erroDetalhe = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Compra rejeitada [HTTP {(int)response.StatusCode}]: {erroDetalhe}");
+        }
+
+        return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
+    }
+
+    /// <summary>
+    /// Passa a vez quando não há pedras na cava e nenhum encaixe válido disponível.
+    /// </summary>
+    public async Task<EstadoPartidaParticipante?> PassarTurnoAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid jogadorId)
+    {
+        var payload = new AcaoRequest(versaoEsperada, Guid.NewGuid(), jogadorId);
+
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/partidas/{partidaId}/passar")
+        {
+            Content = JsonContent.Create(payload)
+        };
+
+        requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
+        requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao.Trim());
+
+        var response = await _httpClient.SendAsync(requestMessage);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var erroDetalhe = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Passagem rejeitada [HTTP {(int)response.StatusCode}]: {erroDetalhe}");
+        }
+
+        return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
+    }
+
+    /// <summary>
+    /// Inicia a partida de forma resiliente, lidando automaticamente com conflitos de versão (HTTP 409).
+    /// </summary>
+    public async Task<EstadoPartidaParticipante?> IniciarPartidaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid chaveIdempotencia, Guid jogadorId)
+    {
+        const int maxTentativas = 3;
+        int tentativa = 0;
+
+        while (tentativa < maxTentativas)
+        {
+            tentativa++;
+            var payload = new AcaoRequest(versaoEsperada, chaveIdempotencia, jogadorId);
+
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/partidas/{partidaId}/iniciar")
+            {
+                Content = JsonContent.Create(payload)
+            };
+
+            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
+            requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao.Trim());
+
+            var response = await _httpClient.SendAsync(requestMessage);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
+            }
+
+            // Se der conflito de estado (409), tentamos buscar a versão mais recente e repetir
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict && tentativa < maxTentativas)
+            {
+                var estadoAtual = await ConsultarEstadoPartidaAsync(tokenBearer, chaveAtivacao, partidaId, jogadorId, 0);
+                if (estadoAtual != null)
+                {
+                    versaoEsperada = estadoAtual.VersaoEstado;
+                    // Gera uma nova chave de idempotência para o retry
+                    chaveIdempotencia = Guid.NewGuid();
+                    continue;
+                }
+            }
+
+            var erroDetalhe = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Erro ao iniciar partida [HTTP {(int)response.StatusCode}]: {erroDetalhe}");
+        }
+
+        return null;
+    }
 }

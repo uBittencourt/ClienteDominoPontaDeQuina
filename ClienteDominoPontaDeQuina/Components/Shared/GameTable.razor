@@ -1,0 +1,509 @@
+﻿@inject DominoApiService ApiService
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<!-- Container Principal da Mesa -->
+<div class="d-flex flex-column h-100 w-100 p-3 m-0 border-0 shadow-none" style="background-color: #000000; color: #f8f9fa;">
+
+    <div class="card p-3 mb-3 shadow" style="background-color: #191B1E; border:1px solid #FFFFFF0A">
+        <h6 class="text-warning fw-bold mb-2" style="font-size: 0.75rem;">CONFIGURAÇÃO DE CONEXÃO DA MESA</h6>
+
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label class="text-light fw-bold" style="font-size: 0.7rem;">Jogador ID (UUID)</label>
+                <input type="text" class="form-control form-control-sm text-light border-secondary font-monospace"
+                       @bind="jogadorIdManual" placeholder="Ex: 839a9101-ce4d..." style="font-size: 0.7rem; background-color: #1E2125" />
+            </div>
+            <div class="col-md-6">
+                <label class="text-light fw-bold" style="font-size: 0.7rem;">Chave de Ativação (X-Jogador-Ativacao)</label>
+                <input type="text" class="form-control form-control-sm text-light border-secondary font-monospace"
+                       @bind="chaveAtivacaoManual" placeholder="Chave hex de 64 caracteres..." style="font-size: 0.7rem; background-color: #1E2125" />
+            </div>
+        </div>
+    </div>
+
+    @if (estadoPartida == null)
+    {
+        <!-- ESTADO VAZIO DA MESA -->
+        <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4 rounded" style="background-color: #191B1E; border:1px solid #FFFFFF0A">
+            <div class="mb-3">
+                <i class="bi bi-controller text-warning" style="font-size: 3rem; opacity: 0.8;"></i>
+            </div>
+            <h5 class="text-warning fw-bold mb-2" style="letter-spacing: 1px;">MESA DE DOMINÓ</h5>
+            <p class="text-light small mb-4" style="max-width: 380px;">
+                Preencha seu ID e Chave acima, cole o UUID da partida e clique em Conectar Mesa.
+            </p>
+
+            <div class="input-group input-group-sm w-75 shadow-sm">
+                <input type="text" class="form-control text-light border-secondary font-monospace" style="background-color: #1E2125" placeholder="Cole o UUID da Partida..." @bind="partidaIdInput" />
+                <button class="btn btn-warning fw-bold text-dark px-3" @onclick="CarregarPartidaDireta">Conectar Mesa</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensagemStatus))
+            {
+                <div class="alert @classeAlerta p-2 mt-3 small w-75 shadow-sm" role="alert">@mensagemStatus</div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Cabeçalho da Mesa -->
+        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+            <div>
+                <span class="badge bg-warning text-dark fw-bold me-2">Rodada @estadoPartida.NumeroRodada</span>
+                <span class="badge bg-secondary">Versão v@(estadoPartida.VersaoEstado)</span>
+                <span class="badge @ObterBadgeSituacao(estadoPartida.Situacao) ms-2">@ObterTextoSituacao(estadoPartida.Situacao)</span>
+                @if (!string.IsNullOrWhiteSpace(ObterPartidaIdEfetivo()))
+                {
+                    <span class="text-light small font-monospace ms-3 user-select-all" title="@ObterPartidaIdEfetivo()" style="opacity: 0.8;">ID: @ObterPartidaIdEfetivo()</span>
+                }
+            </div>
+            <button class="btn btn-sm btn-outline-warning py-0 px-2 fw-bold" @onclick="AtualizarMesaSilenciosa" style="font-size: 0.75rem;">
+                Atualizar Mesa
+            </button>
+        </div>
+
+        <!-- Placar / Participantes da Partida -->
+        @if (estadoPartida.Participantes != null && estadoPartida.Participantes.Any())
+        {
+            <div class="row g-2 mb-3">
+                @foreach (var part in estadoPartida.Participantes)
+                {
+                    <div class="col-md-6">
+                        <div class="p-2 rounded @(part.EhVez && estadoPartida.Situacao != 2 ? "border-warning shadow" : "") d-flex justify-content-between align-items-center" style="background-color: #1E2125; border:1px solid #FFFFFF0A">
+                            <div>
+                                <span class="fw-bold text-warning small">@part.Nome</span>
+                                @if (part.EhVez && estadoPartida.Situacao != 2)
+                                {
+                                    <span class="badge bg-success ms-2" style="font-size: 0.6rem;">Vez de Jogar</span>
+                                }
+                                @if (estadoPartida.Situacao == 2 && ObterVencedor()?.JogadorId == part.JogadorId)
+                                {
+                                    <span class="badge bg-warning text-dark ms-2 fw-bold" style="font-size: 0.6rem;">🏆 VENCEDOR</span>
+                                }
+                                <div class="text-light small" style="font-size: 0.65rem; opacity: 0.8;">Pedras na mão: @part.QuantidadePedrasNaMao</div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge border border-warning text-light px-2 py-1 bg-black" style="font-size: 0.75rem;">
+                                    🏆 <strong>@part.Pontuacao</strong> pts
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (estadoPartida.Situacao == 0)
+        {
+            <div class="alert alert-warning p-2 d-flex justify-content-between align-items-center mb-3">
+                <span class="small fw-bold">A sala está pronta! Clique para sortear as pedras e iniciar.</span>
+                <button class="btn btn-sm btn-success fw-bold text-light px-3" @onclick="IniciarPartidaDireta">
+                    Iniciar Partida agora
+                </button>
+            </div>
+        }
+        else if (estadoPartida.Situacao == 2)
+        {
+            var vencedor = ObterVencedor();
+            <div class="alert alert-success p-3 d-flex flex-column align-items-center justify-content-center mb-3 text-center shadow">
+                <h5 class="fw-bold mb-1">FIM DE JOGO - PARTIDA FINALIZADA</h5>
+                <p class="small mb-0">O jogador <strong class="text-warning">@(vencedor?.Nome ?? "Alguém")</strong> atingiu a pontuação alvo e venceu a partida!</p>
+            </div>
+        }
+
+        <!-- Área Central do Jogo -->
+        <div class="flex-grow-1 rounded p-3 d-flex flex-column align-items-center justify-content-between position-relative overflow-auto mb-3 shadow-inner" style="background-color: #1E2125; min-height: 200px; border:1px solid #FFFFFF0A">
+            <div class="w-100 d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+                <span class="text-uppercase text-secondary fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Tabuleiro / Mesa</span>
+                <div class="d-flex gap-2">
+                    <span class="badge border border-warning text-warning px-2 bg-dark" style="font-size: 0.7rem;">
+                        Ponta Esquerda: <strong class="text-light">@(estadoPartida.Tabuleiro != null && estadoPartida.Tabuleiro.Any() ? estadoPartida.Tabuleiro.First().ValorA.ToString() : "-")</strong>
+                    </span>
+                    <span class="badge border border-warning text-warning px-2 bg-dark" style="font-size: 0.7rem;">
+                        Ponta Direita: <strong class="text-light">@(estadoPartida.Tabuleiro != null && estadoPartida.Tabuleiro.Any() ? estadoPartida.Tabuleiro.Last().ValorB.ToString() : "-")</strong>
+                    </span>
+                </div>
+            </div>
+
+            @if (estadoPartida.Tabuleiro == null || !estadoPartida.Tabuleiro.Any())
+            {
+                <span class="text-light small fst-italic my-auto">Mesa vazia. Aguardando jogada de abertura...</span>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center my-auto p-2">
+                    @foreach (var peca in estadoPartida.Tabuleiro)
+                    {
+                        var ehDupla = peca.ValorA == peca.ValorB;
+                        @if (ehDupla)
+                        {
+                            <div class="d-flex flex-column align-items-center justify-content-between bg-light text-dark rounded border border-warning shadow-sm px-1 py-1" style="width: 32px; height: 60px;">
+                                <span class="fw-bold" style="font-size: 0.75rem; line-height: 1;">@peca.ValorA</span>
+                                <div style="width: 100%; height: 2px; background-color: #ffc107; margin: 2px 0;"></div>
+                                <span class="fw-bold" style="font-size: 0.75rem; line-height: 1;">@peca.ValorB</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-row align-items-center justify-content-between bg-light text-dark rounded border border-warning shadow-sm px-2 py-1" style="width: 65px; height: 32px;">
+                                <span class="fw-bold" style="font-size: 0.8rem;">@peca.ValorA</span>
+                                <div style="width: 2px; height: 100%; background-color: #ffc107; margin: 0 4px;"></div>
+                                <span class="fw-bold" style="font-size: 0.8rem;">@peca.ValorB</span>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
+            <div class="text-secondary text-center w-100" style="font-size: 0.65rem;">
+                Regra Ponta de Quina: A soma das pontas externas múltipla de 5 pontua.
+            </div>
+        </div>
+
+        <!-- Minhas Pedras e Turno -->
+        <div class="rounded p-3" style="background-color: #1E2125; border:1px solid #FFFFFF0A">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-warning fw-bold small">MINHAS PEDRAS (PRIVADO)</span>
+                    @if (estadoPartida.Situacao == 2)
+                    {
+                        <span class="badge bg-danger text-light" style="font-size: 0.65rem;">PARTIDA ENCERRADA</span>
+                    }
+                    else if (EhMeuTurno())
+                    {
+                        <span class="badge bg-success text-light" style="font-size: 0.65rem;">É A SUA VEZ DE JOGAR!</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary text-light" style="font-size: 0.65rem;">Aguardando o adversário...</span>
+                    }
+                </div>
+                <span class="text-light small">Próxima Ação: <strong class="text-warning">@ObterTextoProximaAcao(estadoPartida.ProximaAcao)</strong></span>
+            </div>
+
+            @if (estadoPartida.MinhaMao == null || !estadoPartida.MinhaMao.Any())
+            {
+                <p class="text-light small mb-0 fst-italic" style="opacity: 0.7;">Nenhuma pedra na mão atribuída.</p>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                    @foreach (var peca in estadoPartida.MinhaMao)
+                    {
+                        var p = peca;
+                        var selecionada = pecaSelecionada?.ValorA == p.ValorA && pecaSelecionada?.ValorB == p.ValorB;
+
+                        <div class="d-flex flex-row align-items-center justify-content-between bg-light text-dark rounded border @(selecionada ? "border-danger shadow-lg bg-warning" : "border-warning shadow-sm") px-2 py-1"
+                             style="width: 62px; height: 32px; cursor: pointer; user-select: none;"
+                             @onclick="() => SelecionarPeca(p)" title="Clique para selecionar">
+                            <span class="fw-bold" style="font-size: 0.8rem;">@p.ValorA</span>
+                            <div style="width: 2px; height: 100%; background-color: #ffc107; margin: 0 4px;"></div>
+                            <span class="fw-bold" style="font-size: 0.8rem;">@p.ValorB</span>
+                        </div>
+                    }
+                </div>
+
+                @if (pecaSelecionada != null && estadoPartida.Situacao != 2)
+                {
+                    <div class="alert alert-secondary p-2 small d-flex justify-content-between align-items-center mb-2 border border-warning bg-black text-light">
+                        <span>Pedra Selecionada: <strong class="text-warning">[@pecaSelecionada.ValorA | @pecaSelecionada.ValorB]</strong> — Onde deseja encaixar?</span>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-warning fw-bold text-dark py-1 px-3" @onclick="() => ExecutarJogada(0)">
+                                ⬅️ Esquerda (0)
+                            </button>
+                            <button class="btn btn-sm btn-warning fw-bold text-dark py-1 px-3" @onclick="() => ExecutarJogada(1)">
+                                Direita (1) ➡️
+                            </button>
+                            <button class="btn btn-sm btn-outline-light py-1 px-2" @onclick="() => pecaSelecionada = null">Cancelar</button>
+                        </div>
+                    </div>
+                }
+
+                @if (estadoPartida.Situacao != 2)
+                {
+                    <div class="d-flex gap-2 mt-2 pt-2 border-top border-secondary">
+                        <button class="btn btn-sm btn-outline-warning fw-bold" @onclick="ExecutarCompra">Comprar Peça</button>
+                        <button class="btn btn-sm btn-outline-secondary fw-bold text-light" @onclick="ExecutarPassagem">Passar Turno</button>
+                    </div>
+                }
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(mensagemStatus))
+        {
+            <div class="alert @classeAlerta p-2 mt-2 mb-0 small" role="alert">@mensagemStatus</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? tokenBearer { get; set; }
+    [Parameter] public List<PerfilJogador> jogadores { get; set; } = new();
+    [Parameter] public Guid? partidaId { get; set; }
+    [Parameter] public EstadoPartidaParticipante? estadoPartida { get; set; }
+    [Parameter] public EventCallback<EstadoPartidaParticipante?> estadoPartidaChanged { get; set; }
+
+    private string jogadorIdManual = string.Empty;
+    private string chaveAtivacaoManual = string.Empty;
+    private string partidaIdInput = string.Empty;
+
+    private string? mensagemStatus;
+    private string classeAlerta = "alert-dark";
+    private PecaPartida? pecaSelecionada;
+
+    private string ObterTokenEfetivo()
+    {
+        return Configuration["TOKEN_BEARER"]
+               ?? Configuration["DominoSettings:TokenBearerPadrao"]
+               ?? tokenBearer
+               ?? string.Empty;
+    }
+
+    private string ObterPartidaIdEfetivo()
+    {
+        if (!string.IsNullOrWhiteSpace(partidaIdInput)) return partidaIdInput;
+        if (partidaId.HasValue && partidaId.Value != Guid.Empty) return partidaId.Value.ToString();
+        return string.Empty;
+    }
+
+    private bool EhMeuTurno()
+    {
+        if (estadoPartida == null || string.IsNullOrWhiteSpace(jogadorIdManual)) return false;
+        if (Guid.TryParse(jogadorIdManual, out var jId))
+        {
+            return estadoPartida.JogadorDoTurnoId == jId;
+        }
+        return false;
+    }
+
+    private ResumoParticipantePartida? ObterVencedor()
+    {
+        if (estadoPartida?.Participantes == null || !estadoPartida.Participantes.Any()) return null;
+        return estadoPartida.Participantes.OrderByDescending(p => p.Pontuacao).FirstOrDefault();
+    }
+
+    private void SelecionarPeca(PecaPartida peca)
+    {
+        if (estadoPartida?.Situacao == 2) return;
+        pecaSelecionada = peca;
+    }
+
+    private async Task CarregarPartidaDireta()
+    {
+        if (!Guid.TryParse(jogadorIdManual, out var jId) ||
+            string.IsNullOrWhiteSpace(chaveAtivacaoManual) ||
+            !Guid.TryParse(partidaIdInput, out var pId))
+        {
+            mensagemStatus = "Preencha o Jogador ID, Chave e Partida ID.";
+            classeAlerta = "alert-warning";
+            return;
+        }
+
+        await AtualizarMesaSilenciosa();
+    }
+
+    private async Task AtualizarMesaSilenciosa()
+    {
+        var idPartidaStr = ObterPartidaIdEfetivo();
+        if (!Guid.TryParse(jogadorIdManual, out var jId) || !Guid.TryParse(idPartidaStr, out var pId)) return;
+
+        try
+        {
+            var token = ObterTokenEfetivo();
+            var resultado = await ApiService.ConsultarEstadoPartidaAsync(
+                token,
+                chaveAtivacaoManual.Trim(),
+                pId,
+                jId,
+                estadoPartida?.VersaoEstado ?? 0
+            );
+
+            if (resultado != null)
+            {
+                estadoPartida = resultado;
+                mensagemStatus = null;
+                await estadoPartidaChanged.InvokeAsync(resultado);
+            }
+        }
+        catch (Exception ex)
+        {
+            TratarErroApi(ex);
+        }
+    }
+
+    private async Task IniciarPartidaDireta()
+    {
+        var idPartidaStr = ObterPartidaIdEfetivo();
+
+        if (!Guid.TryParse(jogadorIdManual, out var jId) || string.IsNullOrWhiteSpace(chaveAtivacaoManual))
+        {
+            mensagemStatus = "Preencha o Jogador ID e a Chave de Ativação antes de iniciar.";
+            classeAlerta = "alert-warning";
+            return;
+        }
+
+        if (!Guid.TryParse(idPartidaStr, out var pId))
+        {
+            mensagemStatus = "ID da partida não identificado. Certifique-se de preencher o Jogador ID e Chave acima ou use o painel de conexão.";
+            classeAlerta = "alert-warning";
+            return;
+        }
+
+        try
+        {
+            var token = ObterTokenEfetivo();
+            var resultado = await ApiService.IniciarPartidaAsync(
+                token,
+                chaveAtivacaoManual.Trim(),
+                pId,
+                estadoPartida?.VersaoEstado ?? 0,
+                Guid.NewGuid(),
+                jId
+            );
+
+            if (resultado != null)
+            {
+                estadoPartida = resultado;
+                mensagemStatus = "Partida iniciada com sucesso!";
+                classeAlerta = "alert-success";
+                await estadoPartidaChanged.InvokeAsync(resultado);
+                await AtualizarMesaSilenciosa();
+            }
+        }
+        catch (Exception ex)
+        {
+            TratarErroApi(ex);
+        }
+    }
+
+    private async Task ExecutarJogada(int lado)
+    {
+        if (pecaSelecionada == null || estadoPartida == null || estadoPartida.Situacao == 2) return;
+        var idPartidaStr = ObterPartidaIdEfetivo();
+        if (!Guid.TryParse(jogadorIdManual, out var jId) || !Guid.TryParse(idPartidaStr, out var pId)) return;
+
+        try
+        {
+            var token = ObterTokenEfetivo();
+            var resultado = await ApiService.JogarPecaAsync(
+                token,
+                chaveAtivacaoManual.Trim(),
+                pId,
+                estadoPartida.VersaoEstado,
+                jId,
+                pecaSelecionada.ValorA,
+                pecaSelecionada.ValorB,
+                lado
+            );
+
+            if (resultado != null)
+            {
+                pecaSelecionada = null;
+                estadoPartida = resultado;
+                mensagemStatus = "Jogada realizada com sucesso!";
+                classeAlerta = "alert-success";
+                await estadoPartidaChanged.InvokeAsync(resultado);
+                await AtualizarMesaSilenciosa();
+            }
+        }
+        catch (Exception ex)
+        {
+            TratarErroApi(ex);
+        }
+    }
+
+    private async Task ExecutarCompra()
+    {
+        if (estadoPartida == null || estadoPartida.Situacao == 2) return;
+        var idPartidaStr = ObterPartidaIdEfetivo();
+        if (!Guid.TryParse(jogadorIdManual, out var jId) || !Guid.TryParse(idPartidaStr, out var pId)) return;
+
+        try
+        {
+            var token = ObterTokenEfetivo();
+            var resultado = await ApiService.ComprarPecaAsync(token, chaveAtivacaoManual.Trim(), pId, estadoPartida.VersaoEstado, jId);
+            if (resultado != null)
+            {
+                estadoPartida = resultado;
+                mensagemStatus = "Peça comprada com sucesso!";
+                classeAlerta = "alert-success";
+                await estadoPartidaChanged.InvokeAsync(resultado);
+                await AtualizarMesaSilenciosa();
+            }
+        }
+        catch (Exception ex)
+        {
+            TratarErroApi(ex);
+        }
+    }
+
+    private async Task ExecutarPassagem()
+    {
+        if (estadoPartida == null || estadoPartida.Situacao == 2) return;
+        var idPartidaStr = ObterPartidaIdEfetivo();
+        if (!Guid.TryParse(jogadorIdManual, out var jId) || !Guid.TryParse(idPartidaStr, out var pId)) return;
+
+        try
+        {
+            var token = ObterTokenEfetivo();
+            var resultado = await ApiService.PassarTurnoAsync(token, chaveAtivacaoManual.Trim(), pId, estadoPartida.VersaoEstado, jId);
+            if (resultado != null)
+            {
+                estadoPartida = resultado;
+                mensagemStatus = "Turno passado com sucesso!";
+                classeAlerta = "alert-success";
+                await estadoPartidaChanged.InvokeAsync(resultado);
+                await AtualizarMesaSilenciosa();
+            }
+        }
+        catch (Exception ex)
+        {
+            TratarErroApi(ex);
+        }
+    }
+
+    private void TratarErroApi(Exception ex)
+    {
+        var mensagem = ex.Message;
+        if (mensagem.Contains("ENCAIXE_INVALIDO"))
+        {
+            mensagemStatus = "⚠️ Jogada rejeitada: Esta peça não encaixa na ponta selecionada!";
+        }
+        else if (mensagem.Contains("FORA_DO_TURNO"))
+        {
+            mensagemStatus = "⏳ Aguarde! Não é o seu turno de jogar.";
+        }
+        else
+        {
+            mensagemStatus = $"Erro na operação: {mensagem}";
+        }
+        classeAlerta = "alert-danger";
+        StateHasChanged();
+    }
+
+    private string ObterTextoProximaAcao(int proximaAcao) => proximaAcao switch
+    {
+        0 => "Aguardar",
+        1 => "Jogar Abertura",
+        2 => "Jogar",
+        3 => "Comprar",
+        4 => "Passar",
+        5 => "Encerrar",
+        _ => "Desconhecida"
+    };
+
+    private string ObterBadgeSituacao(int situacao) => situacao switch
+    {
+        0 => "bg-info text-dark",
+        2 => "bg-danger text-light",
+        _ => "bg-success text-light"
+    };
+
+    private string ObterTextoSituacao(int situacao) => situacao switch
+    {
+        0 => "Aguardando Início",
+        2 => "Finalizada",
+        _ => "Em Andamento"
+    };
+}
