@@ -91,4 +91,5 @@ Acesse a aplicação no navegador através do endereço indicado no terminal (ex
 
 | **Partida Completa** |
 | :---: |
-<video src="./Docs/Videos/video_completo_cp_6.mp4" width="100%" controls></video>
+https://github.com/user-attachments/assets/668437e0-5c21-4b3d-bdec-90ccb6f8c885
+
