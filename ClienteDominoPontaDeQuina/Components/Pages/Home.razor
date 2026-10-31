@@ -21,7 +21,7 @@
     <div class="layout-section right-section">
         <MatchesSidebar tokenBearer="@tokenBearer"
                         jogadores="@jogadores"
-                        OnAtualizarRequerido="CarregarDadosGlobais"
+                        OnAtualizarRequerido="CarregarDadosGlobaisAsync"
                         OnPartidaIngressadaCustom="(args) => HandlePartidaIngressadaCustom(args.PartidaId, args.Estado)" />
     </div>
 </div>
@@ -32,13 +32,19 @@
     private EstadoPartidaParticipante? estadoPartidaAtiva;
     private Guid? partidaAtualId;
 
+    /// <summary>
+    /// Inicializa o componente carregando as configurações e dados globais da sessão.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         tokenBearer = ApiService.ObterTokenConfigurado();
-        await CarregarDadosGlobais();
+        await CarregarDadosGlobaisAsync();
     }
 
-    public async Task CarregarDadosGlobais()
+    /// <summary>
+    /// Carrega de forma assíncroma os dados globais da aplicação, incluindo a listagem de jogadores cadastrados.
+    /// </summary>
+    public async Task CarregarDadosGlobaisAsync()
     {
         tokenBearer = ApiService.ObterTokenConfigurado();
         if (string.IsNullOrEmpty(tokenBearer)) return;
@@ -57,6 +63,8 @@
     /// <summary>
     /// Captura o ID da partida e o estado no momento do ingresso, repassando para a mesa central.
     /// </summary>
+    /// <param name="idPartida">Identificador único (UUID) da partida selecionada.</param>
+    /// <param name="novoEstado">Estado atualizado da participação do jogador na partida.</param>
     private void HandlePartidaIngressadaCustom(Guid idPartida, EstadoPartidaParticipante novoEstado)
     {
         partidaAtualId = idPartida;

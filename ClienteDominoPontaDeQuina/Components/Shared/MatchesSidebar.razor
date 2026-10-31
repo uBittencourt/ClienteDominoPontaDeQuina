@@ -111,10 +111,29 @@
 </div>
 
 @code {
+    /// <summary>
+    /// Evento disparado quando o jogador ingressa em uma partida, repassando o estado atualizado da participação.
+    /// </summary>
     [Parameter] public EventCallback<EstadoPartidaParticipante> OnPartidaIngressada { get; set; }
+
+    /// <summary>
+    /// Evento personalizado disparado ao ingressar na partida, contendo o identificador único da partida e o estado da participação.
+    /// </summary>
     [Parameter] public EventCallback<(Guid PartidaId, EstadoPartidaParticipante Estado)> OnPartidaIngressadaCustom { get; set; }
+
+    /// <summary>
+    /// Token de autenticação Bearer utilizado nas requisições HTTP do componente.
+    /// </summary>
     [Parameter] public string? tokenBearer { get; set; }
+
+    /// <summary>
+    /// Lista de perfis de jogadores disponíveis para seleção e interação no lobby.
+    /// </summary>
     [Parameter] public List<PerfilJogador> jogadores { get; set; } = new();
+
+    /// <summary>
+    /// Evento disparado quando é necessária a atualização geral dos dados do componente pai.
+    /// </summary>
     [Parameter] public EventCallback OnAtualizarRequerido { get; set; }
 
     private List<PartidaDisponivel> partidas = new();
@@ -126,11 +145,21 @@
     private string? mensagemStatus;
     private string classeAlerta = "alert-dark";
 
+    /// <summary>
+    /// Obtém o identificador do jogador associado ao ingresso de uma partida específica de forma segura no dicionário local.
+    /// </summary>
+    /// <param name="partidaId">Identificador único (UUID) da partida consultada.</param>
+    /// <returns>O identificador do jogador em formato de string, ou uma string vazia se não estiver mapeado.</returns>
     private string GetJogadorIngresso(Guid partidaId)
     {
         return jogadoresIngressoPorPartida.TryGetValue(partidaId, out var val) ? val : string.Empty;
     }
 
+    /// <summary>
+    /// Define ou atualiza o identificador do jogador associado ao ingresso de uma partida específica no dicionário local.
+    /// </summary>
+    /// <param name="partidaId">Identificador único (UUID) da partida alvo.</param>
+    /// <param name="valor">O valor do identificador do jogador a ser armazenado.</param>
     private void SetJogadorIngresso(Guid partidaId, string? valor)
     {
         jogadoresIngressoPorPartida[partidaId] = valor ?? string.Empty;
@@ -146,7 +175,7 @@
     }
 
     /// <summary>
-    /// Aciona a sincronização do lobby e recarrega os dados globais.
+    /// Atualiza de forma assíncrona o lobby da aplicação, disparando o evento de notificação e recarregando a listagem de partidas.
     /// </summary>
     private async Task AtualizarLobby()
     {
@@ -155,8 +184,10 @@
     }
 
     /// <summary>
-    /// Realiza a chamada HTTP assíncrona para atualizar a listagem de partidas abertas no lobby.
+    /// Carrega de forma assíncrona a lista de partidas disponíveis utilizando o token Bearer configurado,
+    /// gerenciando o indicador de carregamento e o tratamento de eventuais erros de comunicação.
     /// </summary>
+    /// <exception cref="Exception">Capturada internamente e convertida em uma mensagem de alerta visual para o usuário em caso de falha na listagem.</exception>
     private async Task CarregarPartidas()
     {
         if (string.IsNullOrEmpty(tokenBearer)) return;
@@ -181,8 +212,10 @@
     }
 
     /// <summary>
-    /// Executa o caso de uso, recuperando a chave válida salva no localStorage.
+    /// Cria de forma assíncrona uma nova partida por meio da API, validando o jogador criador,
+    /// recuperando a chave de ativação correspondente do armazenamento local e atualizando o status do lobby.
     /// </summary>
+    /// <exception cref="Exception">Capturada internamente e convertida em uma mensagem de alerta visual para o usuário em caso de falha na criação.</exception>
     private async Task CriarPartida()
     {
         if (string.IsNullOrEmpty(tokenBearer)) return;
@@ -233,6 +266,13 @@
         }
     }
 
+    /// <summary>
+    /// Permite que um jogador ingresse de forma assíncrona em uma partida existente, validando o identificador do jogador,
+    /// recuperando a chave de ativação do armazenamento local, atualizando a versão do estado e notificando o componente pai.
+    /// </summary>
+    /// <param name="partidaId">Identificador único (UUID) da partida na qual o jogador deseja ingressar.</param>
+    /// <param name="versaoEstado">Versão atual esperada do estado da partida para controle de concorrência otimista.</param>
+    /// <exception cref="Exception">Capturada internamente e convertida em uma mensagem de alerta visual em caso de falha no processo de ingresso.</exception>
     private async Task IngressarPartida(Guid partidaId, long versaoEstado)
     {
         if (string.IsNullOrWhiteSpace(tokenBearer))

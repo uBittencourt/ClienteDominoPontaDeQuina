@@ -5,8 +5,19 @@
 </div>
 
 @code {
+    /// <summary>
+    /// Representa o primeiro valor numérico da peça de dominó.
+    /// </summary>
     [Parameter] public int ValorA { get; set; }
+
+    /// <summary>
+    /// Representa o segundo valor numérico da peça de dominó.
+    /// </summary>
     [Parameter] public int ValorB { get; set; }
+
+    /// <summary>
+    /// Define se a peça de dominó deve ser renderizada na orientação horizontal (padrão: verdadeiro) ou vertical.
+    /// </summary>
     [Parameter] public bool IsHorizontal { get; set; } = true;
 
     private string Width => IsHorizontal ? "65px" : "36px";

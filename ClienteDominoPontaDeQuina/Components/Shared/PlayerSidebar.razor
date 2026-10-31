@@ -114,11 +114,20 @@
     private string? mensagemStatus;
     private string classeAlerta = "alert-dark";
 
+    /// <summary>
+    /// Método de ciclo de vida executado durante a inicialização do componente, 
+    /// responsável por carregar o token Bearer padrão configurado na aplicação.
+    /// </summary>
     protected override void OnInitialized()
     {
         tokenBearer = ApiService.ObterTokenConfigurado();
     }
 
+    /// <summary>
+    /// Carrega de forma assíncrona os dados iniciais do componente, incluindo a consulta da sessão ativa na API,
+    /// a listagem de jogadores cadastrados e a recuperação das chaves de ativação armazenadas no navegador.
+    /// </summary>
+    /// <exception cref="Exception">Capturada internamente e convertida em uma mensagem de alerta visual para o usuário em caso de falhas na comunicação.</exception>
     private async Task CarregarDadosIniciais()
     {
         carregando = true;
@@ -145,7 +154,6 @@
 
             jogadores = await ApiService.ListarJogadoresAsync(tokenBearer) ?? new();
 
-            // Sincroniza as chaves salvas no localStorage para os jogadores ativos
             chavesAtivas.Clear();
             foreach (var j in jogadores.Where(x => x.Ativo))
             {
@@ -206,6 +214,11 @@
         }
     }
 
+    /// <summary>
+    /// Cria de forma assíncrona um novo jogador na sessão utilizando o token Bearer e o nome informado,
+    /// atualizando a listagem local de jogadores e exibindo a mensagem de sucesso correspondente.
+    /// </summary>
+    /// <exception cref="Exception">Capturada internamente e convertida em uma mensagem de alerta visual para o usuário em caso de falhas na requisição.</exception>
     private async Task AtivarJogadorAsync(Guid jogadorId)
     {
         if (string.IsNullOrWhiteSpace(tokenBearer)) return;
@@ -239,6 +252,12 @@
         }
     }
 
+    /// <summary>
+    /// Desativa de forma assíncrona um jogador na API, recuperando sua chave de ativação local,    
+    /// executando a desativação, removendo os dados correspondentes do armazenamento local e atualizando a interface.
+    /// </summary>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que será desativado.</param>
+    /// <exception cref="Exception">Capturada internamente e convertida em uma mensagem de alerta visual para o usuário em caso de falha na requisição.</exception>
     private async Task DesativarJogadorAsync(Guid jogadorId)
     {
         if (string.IsNullOrWhiteSpace(tokenBearer)) return;

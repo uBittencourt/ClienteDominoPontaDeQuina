@@ -238,10 +238,29 @@
 </div>
 
 @code {
+    /// <summary>
+    /// Token de autenticação Bearer utilizado nas requisições HTTP do componente.
+    /// </summary>
     [Parameter] public string? tokenBearer { get; set; }
+
+    /// <summary>
+    /// Lista de perfis de jogadores disponíveis para seleção e interação no lobby.
+    /// </summary>
     [Parameter] public List<PerfilJogador> jogadores { get; set; } = new();
+
+    /// <summary>
+    /// Identificador único (UUID) opcional da partida carregada na mesa de jogo.
+    /// </summary>
     [Parameter] public Guid? partidaId { get; set; }
+
+    /// <summary>
+    /// Objeto que representa o estado atualizado da partida e a participação do jogador.
+    /// </summary>
     [Parameter] public EstadoPartidaParticipante? estadoPartida { get; set; }
+
+    /// <summary>
+    /// Evento de retorno (EventCallback) disparado para notificar e sincronizar alterações no estado da partida com o componente pai (suporte a @bind-EstadoPartida).
+    /// </summary>
     [Parameter] public EventCallback<EstadoPartidaParticipante?> estadoPartidaChanged { get; set; }
 
     private string jogadorIdManual = string.Empty;
@@ -252,6 +271,10 @@
     private string classeAlerta = "alert-dark";
     private PecaPartida? pecaSelecionada;
 
+    /// <summary>
+    /// Obtém o token de autenticação efetivo aplicando uma cadeia de fallback entre as configurações e o parâmetro local.
+    /// </summary>
+    /// <returns>O token de autenticação em formato de texto, ou uma string vazia se nenhum for encontrado.</returns>
     private string ObterTokenEfetivo()
     {
         return Configuration["TOKEN_BEARER"]
@@ -260,6 +283,10 @@
                ?? string.Empty;
     }
 
+    /// <summary>
+    /// Obtém o identificador efetivo da partida priorizando o valor informado via input manual ou o UUID fornecido por parâmetro.
+    /// </summary>
+    /// <returns>A representação em string do identificador da partida, ou uma string vazia se não estiver definida.</returns>
     private string ObterPartidaIdEfetivo()
     {
         if (!string.IsNullOrWhiteSpace(partidaIdInput)) return partidaIdInput;
@@ -267,6 +294,10 @@
         return string.Empty;
     }
 
+    /// <summary>
+    /// Verifica se o turno atual da partida pertence ao jogador configurado manualmente no cliente.
+    /// </summary>
+    /// <returns>Verdadeiro se for o turno do jogador atual; caso contrário, falso.</returns>
     private bool EhMeuTurno()
     {
         if (estadoPartida == null || string.IsNullOrWhiteSpace(jogadorIdManual)) return false;
@@ -277,18 +308,31 @@
         return false;
     }
 
+    /// <summary>
+    /// Obtém o participante vencedor com base na maior pontuação registrada entre os participantes da partida.
+    /// </summary>
+    /// <returns>O objeto resumo do participante vencedor, ou nulo se não houver participantes cadastrados.</returns>
     private ResumoParticipantePartida? ObterVencedor()
     {
         if (estadoPartida?.Participantes == null || !estadoPartida.Participantes.Any()) return null;
         return estadoPartida.Participantes.OrderByDescending(p => p.Pontuacao).FirstOrDefault();
     }
 
+    /// <summary>
+    /// Seleciona uma peça específica de dominó para ser jogada, desde que a partida não esteja em uma situação finalizada ou bloqueada.
+    /// </summary>
+    /// <param name="peca">O objeto da peça de partida que o usuário deseja selecionar.</param>
     private void SelecionarPeca(PecaPartida peca)
     {
         if (estadoPartida?.Situacao == 2) return;
         pecaSelecionada = peca;
     }
 
+    /// <summary>
+    /// Valida os campos de entrada manuais do usuário (ID do jogador, chave de ativação e ID da partida) 
+    /// e carrega a partida diretamente de forma assíncrona caso os dados estejam corretos.
+    /// </summary>
+    /// <exception cref="Exception">Capturada internamente e repassada ao manipulador de erros da API caso ocorram falhas na comunicação.</exception>
     private async Task CarregarPartidaDireta()
     {
         if (!Guid.TryParse(jogadorIdManual, out var jId) ||
@@ -303,6 +347,11 @@
         await AtualizarMesaSilenciosa();
     }
 
+    /// <summary>
+    /// Atualiza de forma assíncrona e silenciosa o estado da mesa de jogo consultando a API, 
+    /// sem alterar mensagens visuais de alerta caso ocorra em segundo plano.
+    /// </summary>
+    /// <exception cref="Exception">Capturada e tratada pelo método <c>TratarErroApi</c> em caso de falhas na requisição HTTP.</exception>
     private async Task AtualizarMesaSilenciosa()
     {
         var idPartidaStr = ObterPartidaIdEfetivo();
@@ -332,6 +381,11 @@
         }
     }
 
+    /// <summary>
+    /// Valida os dados de identificação e inicia a partida de forma assídua e direta por meio da API,
+    /// atualizando o estado do componente e exibindo mensagens de sucesso ou alerta conforme o resultado.
+    /// </summary>
+    /// <exception cref="Exception">Capturada internamente e repassada ao método <c>TratarErroApi</c> em caso de falhas na requisição HTTP.</exception>
     private async Task IniciarPartidaDireta()
     {
         var idPartidaStr = ObterPartidaIdEfetivo();
@@ -377,6 +431,12 @@
         }
     }
 
+    /// <summary>
+    /// Executa de forma assíncrona a jogada da peça selecionada no lado especificado do tabuleiro,
+    /// atualizando o estado da partida e limpando a seleção caso a operação seja bem-sucedida.
+    /// </summary>
+    /// <param name="lado">O lado do tabuleiro onde a peça será encaixada (ex: 0 para a esquerda, 1 para a direita).</param>
+    /// <exception cref="Exception">Capturada internamente e repassada ao manipulador de erros da API em caso de falhas na requisição.</exception>
     private async Task ExecutarJogada(int lado)
     {
         if (pecaSelecionada == null || estadoPartida == null || estadoPartida.Situacao == 2) return;
@@ -413,6 +473,11 @@
         }
     }
 
+    /// <summary>
+    /// Realiza de forma assíncrona a compra de uma nova peça do monte para o jogador atual,
+    /// atualizando o estado da mesa e exibindo a mensagem de sucesso correspondente.
+    /// </summary>
+    /// <exception cref="Exception">Capturada internamente e repassada ao manipulador de erros da API em caso de falhas.</exception>
     private async Task ExecutarCompra()
     {
         if (estadoPartida == null || estadoPartida.Situacao == 2) return;
@@ -438,6 +503,11 @@
         }
     }
 
+    /// <summary>
+    /// Executa de forma assíncrona a passagem do turno atual quando o jogador não possui opções de jogada ou compra,
+    /// atualizando o estado global da partida.
+    /// </summary>
+    /// <exception cref="Exception">Capturada internamente e repassada ao manipulador de erros da API em caso de falhas na requisição.</exception>
     private async Task ExecutarPassagem()
     {
         if (estadoPartida == null || estadoPartida.Situacao == 2) return;
@@ -463,6 +533,11 @@
         }
     }
 
+    /// <summary>
+    /// Trata as exceções capturadas durante as chamadas à API, formatando mensagens de status amigáveis 
+    /// de acordo com o erro retornado e atualizando o estado visual do componente.
+    /// </summary>
+    /// <param name="ex">A exceção capturada durante a execução da operação.</param>
     private void TratarErroApi(Exception ex)
     {
         var mensagem = ex.Message;
@@ -482,6 +557,11 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Obtém a descrição textual correspondente ao código numérico da próxima ação esperada na partida.
+    /// </summary>
+    /// <param name="proximaAcao">O código inteiro representando a próxima ação (ex: 0 para Aguardar, 2 para Jogar).</param>
+    /// <returns>Uma string amigável descrevendo a ação correspondente.</returns>
     private string ObterTextoProximaAcao(int proximaAcao) => proximaAcao switch
     {
         0 => "Aguardar",
@@ -493,6 +573,11 @@
         _ => "Desconhecida"
     };
 
+    /// <summary>
+    /// Obtém a classe de estilo CSS (badge) correspondente à situação atual da partida.
+    /// </summary>
+    /// <param name="situacao">O código inteiro representando a situação da partida (ex: 0 para aguardando, 2 para finalizada).</param>
+    /// <returns>Uma string contendo as classes CSS do Bootstrap para estilização do distintivo.</returns>
     private string ObterBadgeSituacao(int situacao) => situacao switch
     {
         0 => "bg-info text-dark",
@@ -500,6 +585,11 @@
         _ => "bg-success text-light"
     };
 
+    /// <summary>
+    /// Obtém o texto descritivo correspondente à situação atual da partida.
+    /// </summary>
+    /// <param name="situacao">O código inteiro representando a situação da partida.</param>
+    /// <returns>Uma string amigável descrevendo o estado atual (ex: Aguardando Início, Finalizada, Em Andamento).</returns>
     private string ObterTextoSituacao(int situacao) => situacao switch
     {
         0 => "Aguardando Início",

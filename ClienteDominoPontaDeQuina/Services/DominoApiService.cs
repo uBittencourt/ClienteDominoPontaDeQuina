@@ -19,10 +19,11 @@ public class DominoApiService
     };
 
     /// <summary>
-    /// Inicializa uma nova instância do serviço da API de dominó.
+    /// Inicializa uma nova instância da classe <see cref="DominoApiService"/> configurando o cliente HTTP e as dependências de configuração.
     /// </summary>
-    /// <param name="httpClient">Instância do HttpClient injetada pelo container.</param>
-    /// <param name="configuration">Configurações da aplicação para leitura de parâmetros.</param>
+    /// <param name="httpClient">Instância do cliente HTTP injetada para comunicação com a API.</param>
+    /// <param name="configuration">Instância de configuração da aplicação utilizada para obter parâmetros como URL base e tokens.</param>
+    /// <exception cref="InvalidOperationException">Lançada quando a chave <c>URL_API</c> não está devidamente configurada no arquivo de configuração.</exception>
     public DominoApiService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
@@ -49,7 +50,7 @@ public class DominoApiService
     /// <summary>
     /// Consulta os dados da sessão atual vinculada ao token Bearer fornecido.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
     /// <returns>Objeto contendo os dados da sessão do usuário autenticado, ou nulo em caso de falha.</returns>
     public async Task<SessaoResponse?> ConsultarSessaoAsync(string tokenBearer)
     {
@@ -63,10 +64,10 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Lista todos os perfis de jogadores associados à conta autenticada.
+    /// Lista de forma assíncrona todos os perfis de jogadores cadastrados no sistema.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <returns>Uma lista contendo os perfis dos jogadores cadastrados.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <returns>Uma lista contendo os perfis dos jogadores encontrados, ou uma lista vazia em caso de falha na requisição ou ausência de registros.</returns>
     public async Task<List<PerfilJogador>> ListarJogadoresAsync(string tokenBearer)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Get, "/api/jogadores");
@@ -79,11 +80,11 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Cria um novo perfil de jogador na conta autenticada.
+    /// Cria um novo jogador/cliente de forma assíncrona, enviando o nome informado no corpo da requisição.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <param name="nome">Nome do jogador (entre 1 e 150 caracteres).</param>
-    /// <returns>O perfil do jogador recém-criado, contendo seu identificador exclusivo.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="nome">Nome do jogador que será cadastrado.</param>
+    /// <returns>O objeto contendo o perfil do jogador recém-criado, ou nulo se a requisição falhar.</returns>
     public async Task<PerfilJogador?> CriarJogadorAsync(string tokenBearer, string nome)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/jogadores")
@@ -99,12 +100,12 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Realiza a ativação do cliente para um jogador específico utilizando uma chave de 64 caracteres hexadecimais.
+    /// Ativa o perfil de um cliente/jogador de forma assíncrona, enviando a chave de ativação correspondente no corpo da requisição.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <param name="jogadorId">Identificador único do jogador.</param>
-    /// <param name="chaveAtivacao">Chave gerada localmente enviada no corpo da requisição.</param>
-    /// <returns>O perfil atualizado do jogador refletindo o estado ativo.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que será ativado.</param>
+    /// <param name="chaveAtivacao">Chave de ativação necessária para validar a ativação do perfil.</param>
+    /// <returns>O objeto contendo o perfil atualizado do jogador após a ativação, ou nulo se a requisição falhar.</returns>
     public async Task<PerfilJogador?> AtivarClienteAsync(string tokenBearer, Guid jogadorId, string chaveAtivacao)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/jogadores/{jogadorId}/ativar-cliente")
@@ -120,12 +121,13 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Desativa o cliente de um jogador informando a chave correspondente no cabeçalho de segurança.
+    /// Desativa o perfil de um cliente/jogador de forma assíncrona, enviando o identificador e a chave de ativação correspondente.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <param name="jogadorId">Identificador único do jogador.</param>
-    /// <param name="chaveAtivacao">Chave secreta original enviada no header X-Jogador-Ativacao.</param>
-    /// <returns>O perfil atualizado do jogador com o status inativado.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que será desativado.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <returns>O objeto contendo o perfil atualizado do jogador após a desativação, ou nulo se não houver conteúdo.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro ao tentar desativar o cliente.</exception>
     public async Task<PerfilJogador?> DesativarClienteAsync(string tokenBearer, Guid jogadorId, string chaveAtivacao)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/jogadores/{jogadorId}/desativar-cliente");
@@ -145,10 +147,10 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Lista as partidas disponíveis no servidor para visualização ou ingresso de participantes.
+    /// Lista de forma assíncrona todas as partidas disponíveis no servidor que estão abertas para visualização ou ingresso.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <returns>Coleção contendo as partidas disponíveis no lobby.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <returns>Uma lista contendo as partidas disponíveis encontradas, ou uma lista vazia em caso de falha ou ausência de registros.</returns>
     public async Task<List<PartidaDisponivel>> ListarPartidasDisponiveisAsync(string tokenBearer)
     {
         var requestMessage = new HttpRequestMessage(HttpMethod.Get, "/api/partidas");
@@ -161,14 +163,14 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Cria uma nova partida definindo a pontuação alvo e registrando o solicitante como primeiro participante.
-    /// Requer autenticação via Bearer token e validação criptográfica via header X-Jogador-Ativacao.
+    /// Cria uma nova partida de dominó de forma assíncrona, enviando a pontuação alvo e o identificador do jogador criador.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta de usuário.</param>
-    /// <param name="chaveAtivacao">Chave secreta de ativação do jogador criador (X-Jogador-Ativacao).</param>
-    /// <param name="pontuacaoAlvo">Pontuação limite necessária para vencer a partida.</param>
-    /// <param name="jogadorId">Identificador único do jogador criador.</param>
-    /// <returns>O estado inicial detalhado da partida criada, ou lança exceção descritiva.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="pontuacaoAlvo">Pontuação limite definida para o término da partida.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador criador da sala.</param>
+    /// <returns>O objeto contendo o estado inicial da partida e a participação do jogador criado.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro ao tentar criar a partida.</exception>
     public async Task<EstadoPartidaParticipante?> CriarPartidaAsync(string tokenBearer, string chaveAtivacao, int pontuacaoAlvo, Guid jogadorId)
     {
         var payload = new CriarPartidaRequest(pontuacaoAlvo, jogadorId);
@@ -193,15 +195,16 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Ingressa em uma partida existente como o segundo participante, transicionando a mesa para o estado ativo.
+    /// Realiza o ingresso de um jogador em uma partida existente de forma assíncrona, enviando o payload de solicitação e os cabeçalhos de autenticação e ativação.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta.</param>
-    /// <param name="chaveAtivacao">Chave secreta de ativação do jogador que está ingressando (X-Jogador-Ativacao).</param>
-    /// <param name="partidaId">Identificador único da partida alvo.</param>
-    /// <param name="versaoEsperada">Versão atual do estado para controle otimista de concorrência.</param>
-    /// <param name="chaveIdempotencia">Guid gerado para assegurar idempotência na requisição.</param>
-    /// <param name="jogadorId">Identificador único do jogador que está ingressando.</param>
-    /// <returns>O estado atualizado da partida após o ingresso, ou nulo em caso de falha.</returns>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="partidaId">Identificador único (UUID) da partida na qual o jogador deseja ingressar.</param>
+    /// <param name="versaoEsperada">Versão atual esperada do estado da partida para controle de concorrência.</param>
+    /// <param name="chaveIdempotencia">Chave única (UUID) para garantir a idempotência da requisição.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que está ingressando na partida.</param>
+    /// <returns>O objeto atualizado contendo o novo estado da partida e a participação do jogador após o ingresso.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro (falha ao ingressar na partida).</exception>
     public async Task<EstadoPartidaParticipante?> IngressarPartidaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid chaveIdempotencia, Guid jogadorId)
     {
         var payload = new IngressarRequest(versaoEsperada, chaveIdempotencia, jogadorId, null);
@@ -226,18 +229,17 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Consulta o estado atualizado e privado de uma partida em andamento para a visão do participante.
+    /// Consulta de forma assíncrona o estado atual de uma partida específica para um determinado jogador, permitindo opcionalmente filtrar por versão.
     /// </summary>
-    /// <param name="tokenBearer">Token de autenticação da conta de usuário.</param>
-    /// <param name="chaveAtivacao">Chave secreta de ativação do jogador solicitante (X-Jogador-Ativacao).</param>
-    /// <param name="partidaId">Identificador único (Guid) da partida.</param>
-    /// <param name="jogadorId">Identificador único (Guid) do jogador consultando a visão privada.</param>
-    /// <param name="versaoConhecida">Versão atual conhecida localmente (usada para otimização com retorno 204).</param>
-    /// <returns>O estado completo e detalhado da partida (`EstadoPartidaParticipante`), ou nulo se não houver alterações (204).</returns>
-    /// <exception cref="InvalidOperationException">Lançado caso ocorra falha ou erro HTTP na consulta.</exception>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="partidaId">Identificador único (UUID) da partida que está sendo consultada.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que está realizando a consulta.</param>
+    /// <param name="versaoEstado">Versão opcional do estado para controle de atualização (padrão é 0).</param>
+    /// <returns>O objeto contendo o estado atualizado da partida e participação.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro ao tentar consultar a partida.</exception>
     public async Task<EstadoPartidaParticipante?> ConsultarEstadoPartidaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, Guid jogadorId, long versaoEstado = 0)
     {
-        // Monta a URL idêntica ao que funcionou no Swagger
         var url = $"/api/partidas/{partidaId}?jogadorId={jogadorId}";
         if (versaoEstado > 0)
         {
@@ -245,11 +247,7 @@ public class DominoApiService
         }
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
-
-        // 1. Autorização da Conta (Bearer)
         requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenBearer);
-
-        // 2. Chave de Ativação do Jogador (Header exigido pelo requisito do professor)
         requestMessage.Headers.Add("X-Jogador-Ativacao", chaveAtivacao.Trim());
 
         var response = await _httpClient.SendAsync(requestMessage);
@@ -264,8 +262,18 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Executa uma jogada de encaixe de uma pedra em um dos lados do tabuleiro (0 = Esquerda, 1 = Direita).
+    /// Realiza a jogada de uma peça específica no tabuleiro da partida informada, utilizando os parâmetros de validação e o lado desejado.
     /// </summary>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="partidaId">Identificador único (UUID) da partida em andamento.</param>
+    /// <param name="versaoEsperada">Versão atual esperada do estado da partida para controle de concorrência.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que está realizando a jogada.</param>
+    /// <param name="valorA">Primeiro valor numérico da peça de dominó.</param>
+    /// <param name="valorB">Segundo valor numérico da peça de dominó.</param>
+    /// <param name="lado">Lado do tabuleiro onde a peça será encaixada (ex: 0 para esquerda, 1 para direita).</param>
+    /// <returns>O objeto atualizado contendo o novo estado da partida e a participação do jogador.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro (falha na jogada).</exception>
     public async Task<EstadoPartidaParticipante?> JogarPecaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid jogadorId, int valorA, int valorB, int lado)
     {
         var payload = new JogarRequest(versaoEsperada, Guid.NewGuid(), jogadorId, valorA, valorB, lado);
@@ -290,8 +298,15 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Solicita a compra de uma peça na cava quando não há opções de encaixe na mão.
+    /// Executa a ação de comprar uma peça do monte para o jogador na partida informada.
     /// </summary>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="partidaId">Identificador único (UUID) da partida em andamento.</param>
+    /// <param name="versaoEsperada">Versão atual esperada do estado da partida para controle de concorrência.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que está realizando a compra da peça.</param>
+    /// <returns>O objeto atualizado contendo o novo estado da partida após a compra.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro (falha na compra).</exception>
     public async Task<EstadoPartidaParticipante?> ComprarPecaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid jogadorId)
     {
         var payload = new AcaoRequest(versaoEsperada, Guid.NewGuid(), jogadorId);
@@ -316,8 +331,15 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Passa a vez quando não há pedras na cava e nenhum encaixe válido disponível.
+    /// Executa a ação de passar o turno do jogador atual na partida informada, caso não possua jogadas ou compras disponíveis.
     /// </summary>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="partidaId">Identificador único (UUID) da partida em andamento.</param>
+    /// <param name="versaoEsperada">Versão atual esperada do estado da partida para controle de concorrência.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador que está passando o turno.</param>
+    /// <returns>O objeto atualizado contendo o novo estado da partida após a passagem do turno.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando a API retorna um código de status de erro (falha ao passar turno).</exception>
     public async Task<EstadoPartidaParticipante?> PassarTurnoAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid jogadorId)
     {
         var payload = new AcaoRequest(versaoEsperada, Guid.NewGuid(), jogadorId);
@@ -342,8 +364,16 @@ public class DominoApiService
     }
 
     /// <summary>
-    /// Inicia a partida de forma resiliente, lidando automaticamente com conflitos de versão (HTTP 409).
+    /// Inicia uma partida de dominó de forma assíncrona, aplicando tentativas de reenvio em caso de conflito de versão (concorrência otimista).
     /// </summary>
+    /// <param name="tokenBearer">Token de autenticação Bearer da sessão.</param>
+    /// <param name="chaveAtivacao">Chave de ativação do jogador utilizada no cabeçalho X-Jogador-Ativacao.</param>
+    /// <param name="partidaId">Identificador único (UUID) da partida que será iniciada.</param>
+    /// <param name="versaoEsperada">Versão atual esperada do estado da partida para controle de concorrência.</param>
+    /// <param name="chaveIdempotencia">Chave única (UUID) para garantir a idempotência da requisição contra duplicações.</param>
+    /// <param name="jogadorId">Identificador único (UUID) do jogador responsável por iniciar a partida.</param>
+    /// <returns>O objeto atualizado contendo o novo estado da partida após o início, ou nulo se esgotarem as tentativas.</returns>
+    /// <exception cref="InvalidOperationException">Lançada quando ocorrem falhas persistentes na API ao tentar iniciar a partida.</exception>
     public async Task<EstadoPartidaParticipante?> IniciarPartidaAsync(string tokenBearer, string chaveAtivacao, Guid partidaId, long versaoEsperada, Guid chaveIdempotencia, Guid jogadorId)
     {
         const int maxTentativas = 3;
@@ -369,14 +399,12 @@ public class DominoApiService
                 return await response.Content.ReadFromJsonAsync<EstadoPartidaParticipante>(_jsonOptions);
             }
 
-            // Se der conflito de estado (409), tentamos buscar a versão mais recente e repetir
             if (response.StatusCode == System.Net.HttpStatusCode.Conflict && tentativa < maxTentativas)
             {
                 var estadoAtual = await ConsultarEstadoPartidaAsync(tokenBearer, chaveAtivacao, partidaId, jogadorId, 0);
                 if (estadoAtual != null)
                 {
                     versaoEsperada = estadoAtual.VersaoEstado;
-                    // Gera uma nova chave de idempotência para o retry
                     chaveIdempotencia = Guid.NewGuid();
                     continue;
                 }
