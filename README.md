@@ -1,4 +1,4 @@
-# Dominó — Plataforma Web de Gerenciamento e Partidas de Dominó em Tempo Real
+# Cliente Dominó Ponta de Quina
 
 ## Índice
 
