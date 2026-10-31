@@ -47,6 +47,9 @@ A aplicação implementa um manipulador centralizado de respostas HTTP que anali
 ### Controle de Estado Concorrente e Idempotência
 A concorrência otimista é mantida enviando o campo `VersaoEstado` a cada ação realizada no tabuleiro. Se o estado da partida mudar no servidor antes do envio da jogada, a API rejeita a requisição, forçando o cliente a reatualizar a mesa antes de submeter uma nova ação.
 
+| **Diagrama de Classes** |
+| :---: |
+| ![Diagrama de Classes](./Docs/Images/diagrama_domino.jpg) |
 
 ---
 
@@ -83,3 +86,9 @@ dotnet run
 Acesse a aplicação no navegador através do endereço indicado no terminal (ex: `https://localhost:5001`).
 
 ---
+
+## Evidências de Execução
+
+| **Partida Completa** |
+| :---: |
+<video src="./Docs/Videos/video_completo_cp_6.mp4" width="100%" controls></video>
