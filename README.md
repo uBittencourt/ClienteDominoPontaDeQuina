@@ -102,3 +102,6 @@ Acesse a aplicação no navegador através do endereço indicado no terminal (ex
 | :---: |
 https://github.com/user-attachments/assets/668437e0-5c21-4b3d-bdec-90ccb6f8c885
 
+| **Partida Completa contra Bot** |
+| :---: |
+https://github.com/user-attachments/assets/c7244ef7-d85e-468d-8a19-d49539f7328f
