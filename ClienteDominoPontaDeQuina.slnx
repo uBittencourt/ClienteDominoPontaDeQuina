@@ -2,5 +2,6 @@
   <Folder Name="/Itens de Solução/">
     <File Path=".gitignore" />
   </Folder>
+  <Project Path="ClienteDominoPontaDeQuina.Tests/ClienteDominoPontaDeQuina.Tests.csproj" Id="e9fb9498-2b7b-4926-ab3a-dd108ed5b179" />
   <Project Path="ClienteDominoPontaDeQuina/ClienteDominoPontaDeQuina.csproj" />
 </Solution>

@@ -2,7 +2,7 @@
 
 ## Índice
 
-| [Motivação](#motivação-do-projeto) | [Integrantes](#integrantes--3espg) | [Fluxo Comunicação](#fluxo-de-comunicação) | [Tecnologias](#estruturas-arquitetura-e-tecnologias) | [Endpoints](#endpoints-da-api) | [Como Executar](#como-executar-o-projeto) | [Evidências](#evidências-de-execução) |
+| [Motivação](#motivação-do-projeto) | [Integrantes](#integrantes--3espg) | [Fluxo Comunicação](#fluxo-de-comunicação) | [Tecnologias](#estruturas-arquitetura-e-tecnologias) | [Testes Automatizados](#testes-automatizados) | [Como Executar](#como-executar-o-projeto) | [Evidências](#evidências-de-execução) |
 
 ---
 
@@ -59,6 +59,22 @@ O bot analisa dinamicamente o estado do tabuleiro e a mão do jogador a cada cic
 | **Diagrama de Classes** |
 | :---: |
 | ![Diagrama de Classes](./Docs/Images/diagrama_domino.jpg) |
+
+---
+
+## Testes Automatizados
+
+O projeto conta com uma suíte de testes robusta estruturada no projeto `ClienteDominoPontaDeQuina.Tests`, utilizando **xUnit**, **FluentAssertions**, **Moq** e **bUnit** para garantir cobertura tanto da camada de serviços quanto da interface de componentes visuais em memória.
+
+### 1. Testes de Serviços e Regras de Negócio (`Services/`)
+- **`AutonomousPlayerServiceTests.cs` & `DominoApiServiceTests.cs`:** Validam o comportamento do bot autônomo, regras de inicialização de sessão, checagem de execução (`IsExecuting`), lançamento de exceções defensivas com parâmetros inválidos (como tokens vazios) e integração com o ciclo de requisições HTTP utilizando mocks configurados com `IConfiguration` e `HttpClient`.
+
+### 2. Testes de Componentes Visuais com bUnit (`Components/`)
+Os componentes Razor da pasta `Shared` foram testados em ambiente virtual isolado utilizando o framework **bUnit** (`BunitContext`), validando renderização de marcação, parâmetros e interações de interface:
+- **`DominoTileTests.cs`:** Valida a correta renderização e concatenação visual dos valores das peças de dominó (`ValorA` e `ValorB`).
+- **`GameTableTests.cs`:** Verifica o carregamento da mesa de jogo com as dependências injetadas (`HttpClient`, `IConfiguration`, serviços de API e bot) e a integridade de seus elementos estruturais.
+- **`MatchesSidebarTests.cs`:** Testa a barra lateral de lobbies e partidas, assegurando a correta montagem de botões, elementos interativos e listas.
+- **`PlayerSidebarTests.cs`:** Valida o painel de perfil e controle de sessões do jogador, testando interações seguras de clique em elementos e botões da interface.
 
 ---
 
