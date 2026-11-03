@@ -8,6 +8,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<DominoApiService>();
+builder.Services.AddScoped<AutonomousPlayerService>();
 
 var app = builder.Build();
 

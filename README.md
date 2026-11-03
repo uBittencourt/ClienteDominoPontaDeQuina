@@ -8,7 +8,7 @@
 
 ## Motivação do Projeto
 
-O projeto **Dominó** foi desenvolvido para fornecer uma plataforma completa de gerenciamento e simulação de partidas do jogo de dominó via Web. A aplicação foi desenvolvida em **Blazor WebAssembly / Server** (.NET) atuando como o cliente reativo que consome a API REST centralizadora, garantindo o correto fluxo de turnos, controle de estado, validação rigorosa de regras do jogo (como encaixe de peças nas extremidades e controle de compras no monte) e sincronização de dados entre múltiplos jogadores.
+O projeto **Dominó** foi desenvolvido para fornecer uma plataforma completa de gerenciamento e simulação de partidas do jogo de dominó via Web. A aplicação foi desenvolvida em **Blazor WebAssembly / Server** (.NET) atuando como o cliente reativo que consome a API REST centralizadora, garantindo o correto fluxo de turnos, controle de estado, validação rigorosa de regras do jogo (como encaixe de peças nas extremidades e controle de compras no monte), sincronização de dados entre múltiplos jogadores e suporte a **jogadores autônomos (bots)** com IA integrada.
 
 ---
 
@@ -25,6 +25,7 @@ O projeto **Dominó** foi desenvolvido para fornecer uma plataforma completa de 
 1. **Autenticação e Sessão:** O cliente consome o endpoint de sessão enviando um token do tipo Bearer (`Authorization: Bearer <token>`). A API valida a autorização e libera o acesso aos demais recursos da partida.
 2. **Ativação e Chave de Jogador:** Para executar ações de partida (jogar, comprar, passar turno), o cliente envia a chave do jogador no cabeçalho customizado `X-Jogador-Ativacao`, garantindo a integridade e validação de permissão da jogada.
 3. **Idempotência:** Ações de alteração de estado (como criação e ingresso em partidas) utilizam UUIDs no cabeçalho `X-Idempotency-Key` para evitar duplicidade de requisições.
+4. **Jogador Autônomo e Polling:** O bot opera consumindo assincronamente a API em um loop contínuo de background, enquanto o componente da mesa atualiza a interface via polling periódico (`PeriodicTimer`), dispensando atualizações manuais de página.
 
 ---
 
@@ -33,10 +34,11 @@ O projeto **Dominó** foi desenvolvido para fornecer uma plataforma completa de 
 ### Arquitetura de Componentes Blazor
 A interface foi projetada utilizando uma arquitetura modular de componentes Blazor reutilizáveis e desacoplados:
 - **`Home.razor`:** Página principal da aplicação que orquestra a layout global, integrando as sidebars e a mesa de jogo.
-- **`GameTable.razor`:** Componente responsável por renderizar a mesa de jogo, o tabuleiro ativo, as mãos dos jogadores e os controles de ação (jogar, comprar, passar).
+- **`GameTable.razor`:** Componente responsável por renderizar a mesa de jogo, o tabuleiro ativo, as mãos dos jogadores, o polling automático visual e os controles de ação (jogar, comprar, passar, iniciar bot).
 - **`MatchesSidebar.razor`:** Componente lateral destinado à listagem, criação e ingresso em partidas disponíveis no lobby.
 - **`PlayerSidebar.razor`:** Componente responsável pela criação de novos perfis de jogadores, consulta de sessões ativas e desativação de cadastros.
 - **`DominoTile.razor`:** Componente atômico para renderização visual das peças de dominó com suporte a orientação horizontal e vertical.
+- **`AutonomousPlayerService.cs`:** Serviço injetável de background responsável por gerenciar a inteligência de decisão e execução autônoma das jogadas do bot.
 
 ### Abstração e Injeção de Dependência (DI)
 O acesso à API REST é isolado no serviço `DominoApiService`, injetado nativamente pelo contêiner de Injeção de Dependências do .NET. Isso garante testabilidade, manutenção simplificada e desacoplamento da camada de apresentação em relação à camada de infraestrutura de rede.
@@ -46,6 +48,13 @@ A aplicação implementa um manipulador centralizado de respostas HTTP que anali
 
 ### Controle de Estado Concorrente e Idempotência
 A concorrência otimista é mantida enviando o campo `VersaoEstado` a cada ação realizada no tabuleiro. Se o estado da partida mudar no servidor antes do envio da jogada, a API rejeita a requisição, forçando o cliente a reatualizar a mesa antes de submeter uma nova ação.
+
+### Lógica de Tomada de Decisão do Jogador Autônomo
+O bot analisa dinamicamente o estado do tabuleiro e a mão do jogador a cada ciclo de polling:
+1. **Validação de Encaixe:** Filtra apenas as peças da mão que encaixam validamente nas pontas ativas (esquerda e direita).
+2. **Maximização da Pontuação (Múltiplos de 5):** Calcula a soma resultante das extremidades da mesa e prioriza jogadas que geram pontuações múltiplas de 5.
+3. **Descarte Estratégico:** Em caso de ausência de jogadas que pontuem, descarrega a peça de maior valor total (`ValorA + ValorB`) para minimizar penalidades ao fim da rodada.
+4. **Automação Completa:** Executa automaticamente ações de Abertura, Encaixe, Compra no Monte ou Passagem de Turno.
 
 | **Diagrama de Classes** |
 | :---: |
@@ -92,3 +101,7 @@ Acesse a aplicação no navegador através do endereço indicado no terminal (ex
 | **Partida Completa** |
 | :---: |
 <video src="./Docs/Videos/video_completo_cp_6.mp4" width="100%" controls></video>
+
+| **Partida Completa c/ Bot** |
+| :---: |
+<video src="./Docs/Videos/partida_bot_cp_6.mp4" width="100%" controls></video>

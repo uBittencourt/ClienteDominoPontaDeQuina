@@ -1,6 +1,8 @@
 ﻿@inject DominoApiService ApiService
 @inject IJSRuntime JSRuntime
 @inject IConfiguration Configuration
+@inject AutonomousPlayerService BotService
+@implements IAsyncDisposable
 
 <!-- Container Principal da Mesa -->
 <div class="d-flex flex-column h-100 w-100 p-3 m-0 border-0 shadow-none" style="background-color: #000000; color: #f8f9fa;">
@@ -58,9 +60,15 @@
                     <span class="text-light small font-monospace ms-3 user-select-all" title="@ObterPartidaIdEfetivo()" style="opacity: 0.8;">ID: @ObterPartidaIdEfetivo()</span>
                 }
             </div>
-            <button class="btn btn-sm btn-outline-warning py-0 px-2 fw-bold" @onclick="AtualizarMesaSilenciosa" style="font-size: 0.75rem;">
-                Atualizar Mesa
-            </button>
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-sm btn-success py-0 px-2 fw-bold" @onclick="IniciarBotNaPartida" style="font-size: 0.75rem;" title="Ativa o bot para jogar automaticamente por este usuário até o fim da partida">
+                    🤖 Iniciar Bot Automático
+                </button>
+
+                <button class="btn btn-sm btn-outline-warning py-0 px-2 fw-bold" @onclick="AtualizarMesaSilenciosa" style="font-size: 0.75rem;">
+                    Atualizar Mesa
+                </button>
+            </div>
         </div>
 
         <!-- Placar / Participantes da Partida -->
@@ -270,6 +278,101 @@
     private string? mensagemStatus;
     private string classeAlerta = "alert-dark";
     private PecaPartida? pecaSelecionada;
+
+    private PeriodicTimer? _timerPolling;
+    private CancellationTokenSource? _ctsPolling;
+
+    /// <summary>
+    /// Método do ciclo de vida acionado na inicialização do componente.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _ctsPolling = new CancellationTokenSource();
+        _timerPolling = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        _ = IniciarPollingTelaAsync(_ctsPolling.Token);
+        await base.OnInitializedAsync();
+    }
+
+    /// <summary>
+    /// Executa um loop de polling em segundo plano que atualiza a mesa de forma transparente sem recarregar a tela manualmente.
+    /// </summary>
+    /// <param name="cancellationToken">Sinalizador de cancelamento de tarefa.</param>
+    private async Task IniciarPollingTelaAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (await _timerPolling!.WaitForNextTickAsync(cancellationToken))
+            {
+                var idPartidaStr = ObterPartidaIdEfetivo();
+                if (!string.IsNullOrWhiteSpace(idPartidaStr) &&
+                    Guid.TryParse(jogadorIdManual, out _) &&
+                    !string.IsNullOrWhiteSpace(chaveAtivacaoManual))
+                {
+                    await AtualizarMesaSilenciosaBackground();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Polling da interface cancelado.");
+        }
+    }
+
+    /// <summary>
+    /// Consulta o estado atual da partida na API sem modificar as variáveis visuais de alerta ou status.
+    /// </summary>
+    private async Task AtualizarMesaSilenciosaBackground()
+    {
+        var idPartidaStr = ObterPartidaIdEfetivo();
+        if (!Guid.TryParse(jogadorIdManual, out var jId) || !Guid.TryParse(idPartidaStr, out var pId))
+        {
+            return;
+        }
+
+        try
+        {
+            var token = ObterTokenEfetivo();
+            var resultado = await ApiService.ConsultarEstadoPartidaAsync(
+                token,
+                chaveAtivacaoManual.Trim(),
+                pId,
+                jId,
+                estadoPartida?.VersaoEstado ?? 0
+            );
+
+            if (resultado != null)
+            {
+                estadoPartida = resultado;
+                await estadoPartidaChanged.InvokeAsync(resultado);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[API Error no Polling Background]: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Inicia o Jogador Autônomo (Bot) para assumir a partida de forma definitiva até o seu encerramento.
+    /// </summary>
+    private void IniciarBotNaPartida()
+    {
+        var idPartidaStr = ObterPartidaIdEfetivo();
+        if (!Guid.TryParse(jogadorIdManual, out var jId) ||
+            string.IsNullOrWhiteSpace(chaveAtivacaoManual) ||
+            !Guid.TryParse(idPartidaStr, out var pId))
+        {
+            mensagemStatus = "Preencha o Jogador ID, Chave e Partida ID antes de iniciar o bot.";
+            classeAlerta = "alert-warning";
+            return;
+        }
+
+        var token = ObterTokenEfetivo();
+        BotService.IniciarBot(token, chaveAtivacaoManual.Trim(), pId, jId);
+        mensagemStatus = "🤖 Jogador Autônomo iniciado com sucesso! Ele jogará por este participante até o fim da partida.";
+        classeAlerta = "alert-success";
+    }
 
     /// <summary>
     /// Obtém o token de autenticação efetivo aplicando uma cadeia de fallback entre as configurações e o parâmetro local.
@@ -596,4 +699,17 @@
         2 => "Finalizada",
         _ => "Em Andamento"
     };
+
+    /// <summary>
+    /// Realiza a liberação dos recursos de polling e do timer assíncrono ao fechar o componente.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_ctsPolling != null)
+        {
+            await _ctsPolling.CancelAsync();
+            _ctsPolling.Dispose();
+        }
+        _timerPolling?.Dispose();
+    }
 }
